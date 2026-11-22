@@ -81,7 +81,10 @@ function renderRecipe(id) {
   app.className = "wide";
 
   const meta = ["Ready in " + (r.time_text || minutesText(r.total_minutes))];
-  if (r.time_text && r.total_minutes_estimated) meta[0] += " (about " + minutesText(r.total_minutes) + ")";
+  const about = minutesText(r.total_minutes);
+  if (r.time_text && r.total_minutes_estimated && r.time_text.toLowerCase().replace(/^(a|an|one)\s+/, "1 ") !== about) {
+    meta[0] += " (about " + about + ")";
+  }
   if (r.yield) meta.push(/^(serves|makes)/i.test(r.yield) ? r.yield : "Serves " + r.yield);
   if (r.source) meta.push("Credit: " + r.source.replace(/\.$/, ""));
 
