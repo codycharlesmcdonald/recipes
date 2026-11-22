@@ -2,7 +2,7 @@
 
     python3 -I tools/make_pdf.py recipes/<file>.json [--out folder]
 
-The PDF goes to docs/pdf/<id>-v<version>.pdf, where the site links to it.
+The PDF goes to docs/grub/pdf/<id>-v<version>.pdf, where the site links to it.
 
 The page is 509.3 x 679.1 pt (1620 x 2160 px at 229 ppi), so the tablet shows it at full size with no
 scaling. Every page carries the recipe's id, version and page number as plain text in the footer, which
@@ -189,7 +189,7 @@ def main():
     src = os.path.abspath(args.recipe)
     r = json.load(open(src, encoding="utf-8"))
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    out_dir = os.path.abspath(args.out) if args.out else os.path.join(root, "docs", "pdf")
+    out_dir = os.path.abspath(args.out) if args.out else os.path.join(root, "docs", "grub", "pdf")
     work_dir = os.path.join(root, "pdf-work")          # the HTML each PDF is printed from; not published
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(work_dir, exist_ok=True)

@@ -1,4 +1,4 @@
-"""Check every recipe in recipes/ and write the one data file the site loads, docs/data/recipes.json.
+"""Check every recipe in recipes/ and write the one data file the site loads, docs/grub/data/recipes.json.
 
     python3 -I -B tools/build.py
 
@@ -64,14 +64,14 @@ def main():
         bad += bool(errs)
         if not errs:
             pdf = "pdf/%s-v%s.pdf" % (r["id"], r["version"])
-            if os.path.exists(os.path.join(ROOT, "docs", pdf)):
+            if os.path.exists(os.path.join(ROOT, "docs", "grub", pdf)):
                 r["pdf"] = pdf
             recipes.append(r)
     if bad:
         sys.exit("%d recipe file(s) failed; nothing written" % bad)
     recipes.sort(key=lambda r: (SECTION_ORDER.index(r.get("section")) if r.get("section") in SECTION_ORDER else len(SECTION_ORDER),
                                 r["title"].lower()))
-    out = os.path.join(ROOT, "docs", "data", "recipes.json")
+    out = os.path.join(ROOT, "docs", "grub", "data", "recipes.json")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as fh:
         json.dump({"sections": SECTION_ORDER, "recipes": recipes}, fh, ensure_ascii=False, separators=(",", ":"))
