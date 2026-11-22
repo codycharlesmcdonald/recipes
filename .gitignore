@@ -1,0 +1,8 @@
+# working files that are not part of the site
+/import/
+/pdf/
+/pdf-work/
+/SPEC.md
+__pycache__/
+*.pyc
+.DS_Store

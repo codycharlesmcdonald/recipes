@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "thai-custard",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Thai Custard",
+  "section": "Basics",
+  "headnote": "(serve over sticky rice). More secrets from the esteemed nana of cuisine.",
+  "yield": "4 people",
+  "time_text": "60 minutes",
+  "total_minutes": 60,
+  "active_minutes": 15,
+  "tags": [
+    "custard",
+    "eggs",
+    "coconut",
+    "thai"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "6",
+          "unit": "",
+          "name": "eggs",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Palm sugar",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Pandan leaf",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Coconut milk",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Boil water in the bottom of a steamer",
+        "Hand whisk ingredients in a bowl",
+        "Strain into another bowl and put the bowl in a steamer"
+      ]
+    },
+    {
+      "section": "Cook",
+      "items": [
+        "Steam for 20-30 minutes. Test with a fork. Steam until the center is no longer custard"
+      ]
+    }
+  ]
+}

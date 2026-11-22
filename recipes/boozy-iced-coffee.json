@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "id": "boozy-iced-coffee",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Boozy Iced Coffee",
+  "section": "Drank",
+  "source": "Cody",
+  "headnote": "It’s caffeinated. It’s creamy. It will put you flat on your ass. Inspired by the old-school iced Kahlua Kicker @ Dutch Bros.",
+  "yield": "3 people",
+  "total_minutes": 18,
+  "total_minutes_estimated": true,
+  "active_minutes": 10,
+  "tags": [
+    "coffee",
+    "cocktail",
+    "liqueur"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "6",
+          "unit": "tablespoons",
+          "name": "Baileys",
+          "note": ""
+        },
+        {
+          "qty": "6",
+          "unit": "tablespoons",
+          "name": "Kalua",
+          "note": ""
+        },
+        {
+          "qty": "30",
+          "unit": "g",
+          "name": "medium roast beans",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Grind coffee beans mildly more coarse than you would for a traditional pot.",
+        "Put 300g ice in chemex; store in freezer"
+      ]
+    },
+    {
+      "section": "Brew",
+      "items": [
+        "Boil ~1 liter water, let rest to 208ºF. If you don’t have a thermometer, give it about 2 minutes resting at room temp.",
+        "Bloom that batch. Pull out your chemex, toss in a fresh filter, dump your 30g of grind in and shake level. Set on scale & reset to 0 with grind & filter sitting over ice.",
+        "Slowly pour enough water to soak all the grind and stop. Rule of thumb is 2x the amount of grind (30g X 2 = 60ml), but if I can manage to soak all my grind with less water, I’ll stop. Don't reset your scale.",
+        "After blooming has stopped and the grind has sunk back, slowly pour in 300ml water and stop. I swirl the grind as it brews for an even extraction, but I have no evidence this actually works any better than just waiting. Should take around 4 minutes to brew. Tighten or loosen your grind to fit your taste.",
+        "Toss your filter & grind",
+        "Add your booze and swirl it around like the hipster you are. Serve over ice in a beaker or something pretentious."
+      ]
+    }
+  ],
+  "notes": [
+    "(requires Chemex or V60 w/ carafe w/ a food scale)",
+    "Workin on a salted caramel Kicker recipe - stay tuned."
+  ]
+}

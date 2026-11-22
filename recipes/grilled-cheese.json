@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "id": "grilled-cheese",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Grilled Cheese",
+  "section": "Grub",
+  "source": "Cody",
+  "headnote": "I’ll try not to overcomplicate this, but this was Frankenstein's monster of a leftover night that ended up being one of the best meals I’ve ever assembled. A wicked sleeper that, if plated with some rosemary & diligence, would blow any date night out of the water.",
+  "yield": "DON'T SHARE THIS THEY CAN MAKE THEIR OWN (your words from the future, not mine)",
+  "time_text": "20 minutes",
+  "total_minutes": 20,
+  "active_minutes": 20,
+  "tags": [
+    "sandwich",
+    "cheese",
+    "pork"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Brie",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Butter",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "tablespoon",
+          "name": "Parmesan",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Focaccia",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Sharp cheddar",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "rack",
+          "name": "pork ribs",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Coarse sea salt",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Grate 1T parmesan",
+        "Slice focaccia",
+        "Debone your ribs"
+      ]
+    },
+    {
+      "section": "Cook",
+      "items": [
+        "Heat your pan to medium-high and toss a healthy dollop of butter onto the pan. Brown it. Melt, froth, foam, and stir like crazy so it doesn't stick or ash.",
+        "Rub one side of sliced focaccia with salt and parmesan and lay face down",
+        "Top with cheese and ribs",
+        "Same treatment to the other slice and set it on top.",
+        "Flip and dance, and don’t spill it everywhere."
+      ]
+    }
+  ],
+  "notes": [
+    "I used a beloved panini press, so the pan directions are a little bit of a guess. However, I bet a cast iron treatment would smack."
+  ]
+}

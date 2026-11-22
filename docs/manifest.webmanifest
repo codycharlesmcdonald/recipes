@@ -1,0 +1,9 @@
+{
+  "name": "Hi, My Name is Food",
+  "short_name": "Food",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f4f2ef",
+  "theme_color": "#f4f2ef"
+}

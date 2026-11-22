@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "avocado-toast",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Avocado Toast",
+  "section": "Brekky",
+  "headnote": "The Millenial Dilemma. Admit it. It’s incredible.",
+  "yield": "1 person",
+  "time_text": "20 minutes",
+  "total_minutes": 20,
+  "active_minutes": 15,
+  "tags": [
+    "avocado",
+    "toast",
+    "eggs"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "avo",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Mama Lil’s peppers",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Nutritional yeast",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Bread",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Butter",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "",
+          "name": "eggs",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Trader Joe's EBTB seasoning",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "The whole point of this breakfast is you don’t have to prepare",
+        "Like, it’s literally the meal that prepares you for the day ahead."
+      ]
+    },
+    {
+      "section": "Cook",
+      "items": [
+        "Toast your bread",
+        "Poach your eggs",
+        "Butter toast",
+        "Mush on that avocado (if you slice it, I’ll gut ya)",
+        "On goes the egg",
+        "On goes the nuch’",
+        "On goes the Mama Lil’s",
+        "On with the EBTB",
+        "Face that mf"
+      ]
+    }
+  ],
+  "notes": [
+    "I’m hunting down the bread for you guys, but I found a banger. I’ll try to find a way to incorporate hollandaise on extra slow mornings."
+  ]
+}

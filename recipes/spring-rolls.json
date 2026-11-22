@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "spring-rolls",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Fuckin Spring Rolls",
+  "section": "Grub",
+  "headnote": "This is the one. I won’t sugar coat it; this is a bitch to make, so make a lot. Recruit friends, make a day of it. This will get you remembered.",
+  "yield": "8 thousand people",
+  "time_text": "basically half a day",
+  "total_minutes": 205,
+  "total_minutes_estimated": true,
+  "active_minutes": 195,
+  "tags": [
+    "turkey",
+    "rolls",
+    "fried"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "4",
+          "unit": "lbs",
+          "name": "ground turkey",
+          "note": ""
+        },
+        {
+          "qty": "3",
+          "unit": "",
+          "name": "carrots",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "head",
+          "name": "chopped lettuce",
+          "note": ""
+        },
+        {
+          "qty": "6",
+          "unit": "",
+          "name": "chopped chives",
+          "note": "1cm width"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Bean starch noodles",
+          "note": ""
+        },
+        {
+          "qty": "a few",
+          "unit": "",
+          "name": "eggs",
+          "note": ""
+        },
+        {
+          "qty": "75",
+          "unit": "",
+          "name": "egg roll wraps",
+          "note": "spring roll wraps might work; lumpia wraps break too easily"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Cook ground turkey",
+        "Soak bean starch noodles",
+        "Prep all veggies",
+        "Microwave noodles and chop to 1\"",
+        "Mix all ingredients (not eggs, wraps) in a bowl"
+      ]
+    },
+    {
+      "section": "Cook",
+      "items": [
+        "Heat 1\" of oil in a large pan/wok",
+        "Put a dollop of mixture in a wrap and roll up tight, sealing with egg (too tight and they will burst; too little egg and the roll can come undone in the pan; don’t make more than 10 ahead of cooking, they'll dry out and break)",
+        "slide in oil from the side of the pan",
+        "use tongs to flip when the bottom is brown",
+        "put cooked rolls on paper towels to drain and soak"
+      ]
+    }
+  ],
+  "notes": [
+    "Eat as you go; you deserve the extras."
+  ]
+}

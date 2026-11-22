@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "id": "pad-thai-baby",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Pad Thai, Baby",
+  "section": "Grub",
+  "yield": "4 growin’ frat boys",
+  "time_text": "an hour including prep",
+  "total_minutes": 60,
+  "active_minutes": 25,
+  "tags": [
+    "noodles",
+    "thai",
+    "peanut"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "12",
+          "unit": "oz",
+          "name": "pad Thai rice sticks",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "cloves",
+          "name": "garlic",
+          "note": ""
+        },
+        {
+          "qty": "4",
+          "unit": "tablespoons",
+          "name": "fish sauce",
+          "note": ""
+        },
+        {
+          "qty": "5",
+          "unit": "tablespoons",
+          "name": "veggie oil",
+          "note": ""
+        },
+        {
+          "qty": "4 (ish)",
+          "unit": "",
+          "name": "eggs",
+          "note": ""
+        },
+        {
+          "qty": "A couple",
+          "unit": "",
+          "name": "green onions",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "sugar",
+          "note": ""
+        },
+        {
+          "qty": "A",
+          "unit": "teaspoon",
+          "name": "paprika",
+          "note": ""
+        },
+        {
+          "qty": "A half",
+          "unit": "cup",
+          "name": "ground peanuts",
+          "note": ""
+        },
+        {
+          "qty": "A half",
+          "unit": "cup",
+          "name": "peanut butter",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "6 gallons of sriracha",
+          "note": "",
+          "aside": true
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "12 drummers drumming",
+          "note": "",
+          "aside": true
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Enough viper venom to bring down a mature male Ibex",
+          "note": "",
+          "aside": true
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "sriracha",
+          "note": "Stop reading the ingredients, but actually get some sriracha; idk how much. Depends. How tough are you?"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Soakin’ noods put the noodles in a larger bowl and let it soak for 30-45 minutes while you prep.",
+        "Mix your shit K put all your fish sauce, veggie oil, sriracha, & peanut butter in a teeny lil bowl",
+        "Solids this time. Insert some minced garlic, diced onions, sug’, pap’, peanuts, goin in a bow."
+      ]
+    },
+    {
+      "section": "Cook ‘er up",
+      "items": [
+        "Scramble your eggs in a big ol pan (think wok sized) or a huge pot.",
+        "Add your solids and liquids.",
+        "Why did I have you place them separately? I’m an asshole. Jokes on you, idiot. Washing an extra bowl tonight cause Cody said so. Tosh saved you a dish; I wasted one. Entropy is everywhere. That’s what you get for using a cookbook both pad thai and chocolate cake, you maniac.",
+        "Take a breath. Calm down. I’m sorry. I didn’t mean it.",
+        "Come back. It won’t be like before. I promise. Sorry I told you to calm down I should have never misled you in the first place.",
+        "K, that was fuckin weird. Check your noodles. Eat one. If it’s al dente, throw it in the microwave for 30 seconds. Cody, why didn’t you just have me do that in the first place? Because I wanted you to learn a lesson and prepare. Mise en place.",
+        "Drain noodles, add to the rest of the ingredients, and cook ‘em. Stir it around. Don’t let it burn. It takes a bit to cook, but you’ll know when the noods get sticky. I’m pretty bad at this and I have never messed up this step."
+      ]
+    }
+  ],
+  "notes": [
+    "I shit you not, I just made a wrap with some leftover pad thai, a flour tortilla, more peanut butter, more sriracha, and an egg. Heat up the leftovers in a frying pan, put the peanut butter and ‘rach’ in the tortilla, fry an egg over medium, then toss in that little number. Chow time. bonus points if you panini press or bake the lil nugget."
+  ]
+}

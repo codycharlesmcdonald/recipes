@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "id": "buttermilk",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Buttermilk",
+  "section": "Basics",
+  "source": "Cody",
+  "time_text": "10 minutes",
+  "total_minutes": 10,
+  "active_minutes": 1,
+  "tags": [
+    "buttermilk",
+    "milk",
+    "dairy"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Whole milk",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "White distilled vinegar",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Stir in 1 cup of whole milk with 1 tbsp white distilled vinegar",
+        "Let rest for 10 minutes"
+      ]
+    }
+  ],
+  "notes": [
+    "Don’t fuck it up."
+  ]
+}

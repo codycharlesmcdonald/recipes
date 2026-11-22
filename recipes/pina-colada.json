@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "id": "pina-colada",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Piña Colada",
+  "section": "Drank",
+  "source": "Me, Bitch.",
+  "headnote": "I want a Piña Colada almost every day of this goddamn existence.",
+  "total_minutes": 5,
+  "total_minutes_estimated": true,
+  "active_minutes": 5,
+  "tags": [
+    "cocktail",
+    "rum",
+    "pineapple",
+    "coconut"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "100",
+          "unit": "ml",
+          "name": "rum",
+          "note": ""
+        },
+        {
+          "qty": "100",
+          "unit": "ml",
+          "name": "pineapple Juice",
+          "note": ""
+        },
+        {
+          "qty": "100",
+          "unit": "ml",
+          "name": "coconut cream",
+          "note": ""
+        },
+        {
+          "qty": "24",
+          "unit": "oz",
+          "name": "ice",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Throw it all in a blender."
+      ]
+    }
+  ],
+  "notes": [
+    "Get a mason jar out of your cupboard, go to Goodwill, and find a blender with a pitcher that has the same threading as your mason jar. It’s probably going to be an old Oster line. Buy it. Toss the pitcher and whatever Ninja bullshit you bought in college. Now you have a blender that you can fix yourself with some light googling, get parts at any Goodwill, and instead of dealing with that fat pitcher fuckery, you can just screw on literal mason jars and toss them in the dishwasher when you’re done. Added bonus is a 32oz mason jar already has the 100ml markings on it."
+  ]
+}

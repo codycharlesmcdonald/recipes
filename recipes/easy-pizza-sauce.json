@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "id": "easy-pizza-sauce",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Easy Pizza Sauce",
+  "section": "Basics",
+  "source": "Cody McDonald",
+  "headnote": "THE SØS",
+  "yield": "4 pizzas",
+  "time_text": "2 minutes",
+  "total_minutes": 2,
+  "active_minutes": 2,
+  "tags": [
+    "pizza",
+    "sauce",
+    "tomato"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "28",
+          "unit": "oz",
+          "name": "can of crushed tomatoes",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "olive oil",
+          "note": ""
+        },
+        {
+          "qty": "A couple of",
+          "unit": "",
+          "name": "cloves of garlic",
+          "note": ""
+        },
+        {
+          "qty": "A couple of",
+          "unit": "",
+          "name": "pinches of salt",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Mince the garlic",
+        "Mix it all in a quart-sized mason jar and shake it up."
+      ]
+    }
+  ],
+  "notes": [
+    "Wear sunscreen. Contribute to an IRA when you’re young. Take the stairs. Call your mom."
+  ]
+}

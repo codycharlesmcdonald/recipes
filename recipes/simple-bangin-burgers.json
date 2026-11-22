@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "simple-bangin-burgers",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Simple Bangin Burgers",
+  "section": "Grub",
+  "headnote": "This isn’t hard.",
+  "yield": "8 people",
+  "time_text": "20 minutes",
+  "total_minutes": 20,
+  "active_minutes": 20,
+  "tags": [
+    "burgers",
+    "beef",
+    "bacon"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "3",
+          "unit": "lbs",
+          "name": "hamburger",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "sleeve",
+          "name": "Ritz crackers",
+          "note": ""
+        },
+        {
+          "qty": "3",
+          "unit": "tablespoons",
+          "name": "barbecue sauce",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "cup",
+          "name": "shredded cheddar cheese",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "minced yellow onion",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "cloves",
+          "name": "garlic",
+          "note": "minced"
+        },
+        {
+          "qty": "1/4",
+          "unit": "lb",
+          "name": "minced bacon",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Mush it all together in a bowl. Get your hands a lil dirty; have some fun with it."
+      ]
+    },
+    {
+      "section": "Cook",
+      "items": [
+        "I’m not going to mansplain how to cook a fucking burger. I’m sure you got this."
+      ]
+    }
+  ],
+  "notes": [
+    "Fuck it. Text your ex. I don’t have to deal with the consequences."
+  ]
+}

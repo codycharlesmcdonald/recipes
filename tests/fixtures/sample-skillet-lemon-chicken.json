@@ -1,0 +1,43 @@
+{
+  "id": "sample-skillet-lemon-chicken",
+  "version": 1,
+  "sample": true,
+  "title": "Skillet Lemon Chicken Thighs",
+  "headnote": "A placeholder recipe, written only to test the layout and the trip to the tablet and back. It gets replaced by Cody's own.",
+  "yield": "Serves 4",
+  "time": { "active": "20 minutes", "total": "50 minutes" },
+  "tags": ["chicken", "weeknight", "one pan"],
+  "ingredients": [
+    {
+      "section": "Chicken",
+      "items": [
+        { "qty": "8", "unit": "", "name": "bone-in, skin-on chicken thighs", "note": "about 3 pounds" },
+        { "qty": "1 1/2", "unit": "teaspoons", "name": "kosher salt", "note": "" },
+        { "qty": "1/2", "unit": "teaspoon", "name": "black pepper", "note": "" },
+        { "qty": "1", "unit": "tablespoon", "name": "olive oil", "note": "" }
+      ]
+    },
+    {
+      "section": "Pan sauce",
+      "items": [
+        { "qty": "6", "unit": "", "name": "garlic cloves", "note": "smashed" },
+        { "qty": "1", "unit": "", "name": "lemon", "note": "half sliced thin, half juiced" },
+        { "qty": "3/4", "unit": "cup", "name": "chicken stock", "note": "" },
+        { "qty": "2", "unit": "teaspoons", "name": "fresh thyme leaves", "note": "" },
+        { "qty": "2", "unit": "tablespoons", "name": "cold butter", "note": "" }
+      ]
+    }
+  ],
+  "steps": [
+    "Heat the oven to 425 degrees. Pat the chicken dry and season both sides with the salt and pepper.",
+    "Heat the oil in a 12-inch ovenproof skillet over medium-high heat. Lay the thighs in skin side down and cook without moving them until the skin is deep golden and releases from the pan, 8 to 10 minutes.",
+    "Turn the thighs over. Tuck the garlic and lemon slices between them and move the skillet to the oven. Roast until the thickest thigh reads 175 degrees, 18 to 22 minutes.",
+    "Move the chicken to a plate. Pour off all but a tablespoon of fat and set the skillet over medium heat (the handle is hot).",
+    "Add the stock and thyme and scrape up the browned bits. Simmer until reduced by half, about 4 minutes, then stir in the lemon juice.",
+    "Off the heat, swirl in the butter until the sauce is glossy. Taste for salt, return the chicken to the pan skin side up and spoon the sauce around it."
+  ],
+  "notes": [
+    "Boneless thighs work; cut the oven time to about 10 minutes.",
+    "The sauce holds for a few minutes off the heat but breaks if it boils after the butter goes in."
+  ]
+}

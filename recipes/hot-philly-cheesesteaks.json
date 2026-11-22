@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "id": "hot-philly-cheesesteaks",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Hot Philly Cheesesteaks",
+  "section": "Grub",
+  "headnote": "The New Staple. I’ve been asking everyone to pick me up a hot Philly for 6 years, and I recently discovered just how easy it is to make one.",
+  "yield": "2 people",
+  "time_text": "16 minutes",
+  "total_minutes": 16,
+  "active_minutes": 16,
+  "tags": [
+    "beef",
+    "sandwich",
+    "cheesesteak"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "8",
+          "unit": "slices",
+          "name": "roast beef deli slices",
+          "note": ""
+        },
+        {
+          "qty": "2 forkfuls",
+          "unit": "",
+          "name": "Mama Lil’s peppers",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "tablespoon",
+          "name": "butter",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "sandwich slices",
+          "name": "Swiss cheese",
+          "note": ""
+        },
+        {
+          "qty": "1/2",
+          "unit": "",
+          "name": "yellow onion",
+          "note": ""
+        },
+        {
+          "qty": "1/4",
+          "unit": "cup",
+          "name": "warm water",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "",
+          "name": "hoagies",
+          "note": "halved"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "Heat a cast iron pan on medium",
+        "Thinly slice half of your yellow onion. Shoot for 1/8th” or thinner"
+      ]
+    },
+    {
+      "section": "Cook",
+      "items": [
+        "Drop your butter underneath your onions on one half of the pan; in the other half, scoop in the Mama Lil’s. They can touch but can't canoodle",
+        "When your onions are golden and your peppers are charred, evenly distribute them into your hoagies.",
+        "Make two hoagie-shaped parallel piles of meat in your pan.",
+        "Top the meat with the Swiss",
+        "Pour in the water and cover the pan for about 30 seconds while the cheese turns into a gooey mess.",
+        "Scoop into your sandwiches",
+        "Grub"
+      ]
+    }
+  ],
+  "notes": [
+    "Your South Philly impression isn’t as good as you think."
+  ]
+}

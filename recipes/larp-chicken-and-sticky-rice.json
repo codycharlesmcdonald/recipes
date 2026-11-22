@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "id": "larp-chicken-and-sticky-rice",
+  "version": 1,
+  "created": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-22T22:40:00Z",
+  "title": "Larp Chicken & Sticky Rice",
+  "section": "Grub",
+  "headnote": "This is my mom’s favorite Thai dish. It’s just really fuckin good. You do need a thai rice basket for this.",
+  "yield": "8 people",
+  "time_text": "a day",
+  "total_minutes": 1440,
+  "total_minutes_estimated": true,
+  "active_minutes": 50,
+  "tags": [
+    "chicken",
+    "rice",
+    "thai",
+    "salad"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "4",
+          "unit": "cups",
+          "name": "sticky rice",
+          "note": ""
+        },
+        {
+          "qty": "3",
+          "unit": "pounds",
+          "name": "ground chicken",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "teaspoons",
+          "name": "ground rice seasoning",
+          "note": ""
+        },
+        {
+          "qty": "Large bunch of",
+          "unit": "",
+          "name": "green onions",
+          "note": ""
+        },
+        {
+          "qty": "2 handfuls of",
+          "unit": "",
+          "name": "cilantro",
+          "note": ""
+        },
+        {
+          "qty": "Handful of",
+          "unit": "",
+          "name": "mint",
+          "note": ""
+        },
+        {
+          "qty": "2 limes of",
+          "unit": "",
+          "name": "lime juice",
+          "note": ""
+        },
+        {
+          "qty": "5ish",
+          "unit": "",
+          "name": "lime leaves",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Fish sauce",
+          "note": "to taste"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Rep pepper flakes",
+          "note": "to taste"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Preparation",
+      "items": [
+        "24 Hours Prior: Rinse sticky rice and soak overnight in room temperature water",
+        "Day Of: Chop all the veggie"
+      ]
+    },
+    {
+      "section": "Rice",
+      "items": [
+        "Boil water in a rice pot",
+        "Drain water from soaking rice",
+        "Put rice in a Thai rice basket for 2 minutes, then flip",
+        "After 10 more minutes, flip",
+        "After 10 more minutes, flip",
+        "After 10 more minutes, put in a serving bowl or Thai rice basket"
+      ]
+    },
+    {
+      "section": "Chicken",
+      "items": [
+        "Fry in light oil-cook, don’t brown",
+        "Add ground rice",
+        "Add fish sauce",
+        "Add lime juice to taste",
+        "Add pepper flakes"
+      ]
+    },
+    {
+      "section": "Salad",
+      "items": [
+        "Mix salad with ground chicken",
+        "Serve alongside rice"
+      ]
+    }
+  ]
+}
