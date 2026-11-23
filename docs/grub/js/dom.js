@@ -76,6 +76,12 @@ export async function copyWithFallback(text, status, host, okMessage) {
   return false;
 }
 
+// A line one page leaves for the next one to show: Draft says "Added to your recipes" on the recipe's own
+// page. The next page takes it or it is dropped, so it never shows up later somewhere else.
+let word = null;
+export function leaveWord(text) { word = text; }
+export function takeWord() { const w = word; word = null; return w; }
+
 export function download(fileName, text, type) {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = h("a", { href: url, download: fileName, class: "offscreen" });
@@ -85,10 +91,11 @@ export function download(fileName, text, type) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-// A question asked inside the page (never alert, confirm or prompt). Focus goes to the safe answer.
-export function ask(host, question, yesLabel, noLabel, onYes, onClose) {
+// A question asked inside the page (never alert, confirm or prompt). Focus goes to the safe answer. onNo, when
+// given, is what the safe answer does besides closing the question.
+export function ask(host, question, yesLabel, noLabel, onYes, onClose, onNo) {
   const close = () => { host.replaceChildren(); if (onClose) onClose(); };
-  const no = h("button", { type: "button", onclick: close }, noLabel);
+  const no = h("button", { type: "button", onclick: () => { close(); if (onNo) onNo(); } }, noLabel);
   const yes = h("button", { type: "button", class: "danger", onclick: () => { close(); onYes(); } }, yesLabel);
   host.replaceChildren(h("div", { class: "ask", role: "group", "aria-label": question },
     h("p", { class: "ask-q" }, question), h("div", { class: "row" }, yes, no)));

@@ -2,7 +2,8 @@
 // An item is { key, recipeId, recipeTitle, name, qty, unit, got }. recipeId is "" for something he typed in.
 import { fold, nameKey, amountText, mergedLines } from "./lib.js";
 
-export const OWN_TITLE = "Your own";
+// the heading over the things he typed in himself ("your own" is what the site calls the recipes he adds)
+export const OWN_TITLE = "Not from a recipe";
 
 function keyOf(recipeId, i) {
   return (recipeId || "own") + "|" + nameKey(i.name) + "|" + fold(amountText(i));

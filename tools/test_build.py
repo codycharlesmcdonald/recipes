@@ -153,6 +153,25 @@ class TheRealRecipes(unittest.TestCase):
             self.assertEqual(make_pdf.days_label({"days": n}), "%d-day recipe" % n, name)
 
 
+class OwnRecipeAddresses(unittest.TestCase):
+    """A visitor's own recipes live at "my--" and a plain id on their device (docs/grub/js/own.js). That never
+    meets a cookbook address because the build refuses "--" in an id, so these hold the two to the same rule."""
+
+    def test_an_address_of_ones_own_is_never_a_cookbook_id(self):
+        self.assertIn("id is not a slug", build.check(recipe(id="my--beans"), "my--beans"))
+
+    def test_the_file_a_visitor_downloads_is_a_cookbook_id(self):
+        # Download recipe file gives the plain part back, which the build takes as it is
+        self.assertEqual(build.check(recipe(id="beans"), "beans"), [])
+
+    def test_the_site_holds_the_same_id_rule(self):
+        with open(os.path.join(ROOT, "docs", "grub", "js", "own.js"), encoding="utf-8") as fh:
+            own = fh.read()
+        self.assertIn('const ID = /' + build.ID_RE.pattern.replace("(-", "(?:-") + '/;', own)
+        self.assertEqual(int(re.search(r"export const MAX_ID = (\d+);", own).group(1)), 60)
+        self.assertIn('export const OWN_MARK = "my--";', own)
+
+
 class WholeBuild(unittest.TestCase):
     """The build run from start to finish on a throwaway folder shaped like the project."""
 

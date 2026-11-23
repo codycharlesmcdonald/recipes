@@ -10,7 +10,7 @@ import { SITE_TITLE } from "./home.js";
 
 const NOTHING_TO_COPY = "Everything is ticked, so there is nothing to copy.";
 
-export function shopping(app) {
+export function shopping(app, data) {
   document.title = "Shopping | " + SITE_TITLE;
   const summary = h("p", { class: "count quiet small" });
   const body = h("div", {});
@@ -66,8 +66,11 @@ export function shopping(app) {
       body.replaceChildren(h("p", { class: "empty" }, "Nothing on the list. Open a recipe and press Add to shopping list, or add something of your own."));
       return;
     }
+    // A heading links back to its recipe while the recipe is here. Things stay on the list after one of his
+    // own recipes is deleted (or cleared by the browser), and then the heading is only its name.
+    const here = (id) => data.recipes.some((r) => r.id === id);
     body.replaceChildren(...groups(list).map((g) => h("section", { class: "shop-group" },
-      h("h2", {}, g.recipeId ? h("a", { href: "#/r/" + g.recipeId }, g.title) : g.title),
+      h("h2", {}, g.recipeId && here(g.recipeId) ? h("a", { href: "#/r/" + g.recipeId }, g.title) : g.title),
       h("ul", { class: "shop" }, g.items.map((x) => h("li", { class: x.got ? "got" : null, "data-key": x.key },
         h("label", {},
           h("input", { type: "checkbox", checked: x.got, onchange: (e) => { state.setShopping(setGot(state.shopping(), x.key, e.target.checked)); redrawKeeping(x.key); } }),

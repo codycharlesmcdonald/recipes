@@ -11,6 +11,12 @@ export function daysMark(r) {
   return label ? h("span", { class: "days" }, label) : null;
 }
 
+export function ownMark(r) {
+  // The mark on one of his own recipes, wherever its title is listed and on its page: drawn like the days tag,
+  // in the accent colour, so it reads as a label and not as a link. Nothing (null) for a cookbook recipe.
+  return r && r.own === true ? h("span", { class: "yours" }, "Yours") : null;
+}
+
 export function recipeHead(r, { preview = false } = {}) {
   const facts = timeFacts(r);
   const meta = [];
@@ -18,8 +24,8 @@ export function recipeHead(r, { preview = false } = {}) {
   if (r.source) meta.push("Credit: " + r.source);
   const stopped = (m) => m + (/[.!?]$/.test(m) ? "" : ".");
   const sentence = (m) => h("span", {}, stopped(m) + " ");
-  const mark = daysMark(r);
-  // The space on each side of the tag is a little wider than a word space (class "tag-gap"), so the outlined
+  const marks = [daysMark(r), ownMark(r)].filter(Boolean);
+  // The space on each side of a tag is a little wider than a word space (class "tag-gap"), so the outlined
   // tag is not jammed between two sentences. It is still a plain space: at the start or the end of a line it
   // takes no room, so a tag that wraps starts on the left edge like any other line.
   const gap = () => h("span", { class: "tag-gap" }, " ");
@@ -28,12 +34,13 @@ export function recipeHead(r, { preview = false } = {}) {
       ? (r.section ? h("p", { class: "kicker" }, r.section) : null)
       : h("p", { class: "kicker" }, h("a", { href: "#/browse" }, "Browse"),
         r.section ? [h("span", { class: "sep", "aria-hidden": "true" }, "/"), h("a", { href: "#/browse?chapter=" + encodeURIComponent(r.section) }, r.section)] : null),
-    preview ? null : h("p", { class: "print-only book-line" }, SITE_TITLE + (r.section ? ", " + r.section : "")), // on paper, where the top row is not printed
+    // on paper, where the top row is not printed
+    preview ? null : h("p", { class: "print-only book-line" }, (r.own === true ? "Your own recipe" : SITE_TITLE) + (r.section ? ", " + r.section : "")),
     h(preview ? "h2" : "h1", { class: "t1 recipe-title" }, r.title || "Untitled recipe"),
     r.headnote ? h("p", { class: "headnote" }, r.headnote) : null,
-    // the tag sits right after the time; its full stop is for someone hearing the line read out, and is not drawn
+    // the tags sit right after the time; each full stop is for someone hearing the line read out, and is not drawn
     h("p", { class: "meta" },
-      mark ? [h("span", {}, stopped(facts.ready)), gap(), mark, h("span", { class: "offscreen" }, "."), gap()] : sentence(facts.ready),
+      marks.length ? [h("span", {}, stopped(facts.ready)), marks.map((m) => [gap(), m, h("span", { class: "offscreen" }, ".")]), gap()] : sentence(facts.ready),
       meta.map(sentence)),
     facts.guess ? h("p", { class: "guess small quiet" }, facts.guess) : null,
   ];

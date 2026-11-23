@@ -3,7 +3,8 @@ import { h, put, statusLine, copyWithFallback, download, ask } from "../dom.js";
 import { totalText, daysOf, buildPlanIcs, planFileName, chapterList, chapterOf } from "../lib.js";
 import { emptyPlan, addToPlan, removeFromPlan, setPlanMinutes, usableMinutes, realTime, planEntries, longestMinutes, planLines, startWhen, mealMsOf, planDay } from "../plan.js";
 import { totalMinutes, timeProblem } from "../recipe-format.js";
-import { daysMark } from "../recipe-view.js";
+import { daysMark, ownMark } from "../recipe-view.js";
+import { isOwnId } from "../own.js";
 import * as state from "../state.js";
 import { SITE_TITLE } from "./home.js";
 
@@ -18,11 +19,16 @@ export function prep(app, data) {
   const fullDay = (ms) => new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(ms);
 
   let plan = state.plan();
-  plan.items = plan.items.filter((x) => data.recipes.some((r) => r.id === x.id));
+  const here = (x) => data.recipes.some((r) => r.id === x.id);
+  // While his recipes were last saved by a newer version of the site, this page cannot read them, but their
+  // places in the plan are not this page's to drop: they are held aside, not shown, written back with every
+  // save, and shown again once the page is reloaded. A recipe that is simply gone is let go, as before.
+  let held = state.myRecipesNewer() ? plan.items.filter((x) => !here(x) && isOwnId(x.id)) : [];
+  plan.items = plan.items.filter(here);
   if (!realTime(plan.time)) plan.time = state.eatAt();
   if (!ALERTS.some(([v]) => v === plan.alarm)) plan.alarm = "10";
 
-  const save = () => state.setPlan(plan);
+  const save = () => state.setPlan(held.length ? { ...plan, items: plan.items.concat(held) } : plan);
   const status = statusLine();
   const copyHost = h("div", {});
   const askHost = h("div", {});
@@ -60,7 +66,7 @@ export function prep(app, data) {
     picker.replaceChildren(h("option", { value: "" }, left.length ? "Pick a recipe" : "Every recipe is in the plan"),
       ...chapterList(data.sections, data.recipes).map((c) => {
         const list = left.filter((r) => chapterOf(r) === c);
-        return list.length ? h("optgroup", { label: c }, list.map((r) => h("option", { value: r.id }, r.title))) : null;
+        return list.length ? h("optgroup", { label: c }, list.map((r) => h("option", { value: r.id }, r.title + (r.own === true ? " (yours)" : "")))) : null;
       }).filter(Boolean));
   }
 
@@ -96,7 +102,8 @@ export function prep(app, data) {
       return h("li", { "data-id": r.id },
         h("div", { class: "cook-line" },
           // a recipe that needs more than one day says so on its own line, whatever time this plan counts for it
-          h("span", { class: "cook-name" }, h("a", { class: "t", href: "#/r/" + r.id }, r.title), daysMark(r)),
+          h("span", { class: "cook-name" }, h("a", { class: "t", href: "#/r/" + r.id }, r.title), daysMark(r),
+            ownMark(r) ? [h("span", { class: "offscreen" }, ", "), ownMark(r)] : null),
           h("button", { type: "button", class: "linklike remove", "aria-label": "Take " + r.title + " out of the plan", onclick: () => {
             plan = removeFromPlan(plan, r.id); settleDay(); save(); drawPicker(); drawCooking(); drawPlan();
             status.textContent = "Took " + r.title + " out of the plan.";
@@ -157,6 +164,7 @@ export function prep(app, data) {
   const clear = h("button", { type: "button", class: "quiet-btn push", onclick: () => {
     ask(askHost, "Clear the plan?", "Yes, clear it", "Keep it", () => {
       plan = { ...emptyPlan(), time: plan.time, alarm: plan.alarm };
+      held = []; // cleared is cleared, those held aside too
       settleDay(); save(); drawPicker(); drawCooking(); drawPlan();
       status.textContent = "The plan is cleared.";
       picker.focus({ preventScroll: true });

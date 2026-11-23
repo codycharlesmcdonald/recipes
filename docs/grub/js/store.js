@@ -4,6 +4,21 @@
 
 export const PREFIX = "grub.";
 
+function unbox(text, format, fallback) {
+  // a stored value's data, when it is in the format asked for
+  if (text === null || text === undefined) return fallback;
+  try {
+    const box = JSON.parse(text);
+    if (box && typeof box === "object" && box.v === format && "data" in box) return box.data;
+  } catch { /* not ours, or damaged */ }
+  return fallback;
+}
+
+function noRoom(e) {
+  // the browser saves things, but this one does not fit in the room left (each browser has its own name for it)
+  return Boolean(e) && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22 || e.code === 1014);
+}
+
 export function makeStore(backend) {
   const memory = new Map(); // the last value written this visit, as text
   const unsaved = new Set(); // keys whose last write did not reach the backend
@@ -20,19 +35,43 @@ export function makeStore(backend) {
 
   return {
     get(key, format, fallback) {
-      const text = raw(key);
-      if (text === null) return fallback;
-      try {
-        const box = JSON.parse(text);
-        if (box && typeof box === "object" && box.v === format && "data" in box) return box.data;
-      } catch { /* not ours, or damaged */ }
-      return fallback;
+      return unbox(raw(key), format, fallback);
+    },
+    saved(key, format, fallback) {
+      // what the device itself holds, leaving out anything held for this visit only
+      let text = null;
+      try { text = backend.getItem(PREFIX + key); } catch { /* storage is off */ }
+      return unbox(text, format, fallback);
     },
     set(key, format, data) {
       const text = JSON.stringify({ v: format, data });
       memory.set(key, text);
       try { backend.setItem(PREFIX + key, text); unsaved.delete(key); return true; }
       catch { unsaved.add(key); return false; }
+    },
+    put(key, format, data) {
+      // set, for a value that must never be half kept, saying what happened: "kept"; "full" when the browser
+      // saves things but refused this one (there is no room left for it), and nothing changed, not even for the
+      // visit; "visit" when the browser is not saving anything, so it is held for the visit only.
+      // A browser out of room says so by the error's name. That is "full" even when not one more character
+      // fits (a draft saved on every key can use up the last of the room), so a value that did not fit is never
+      // held for the visit, where a later write would put it over what another tab kept meanwhile.
+      const text = JSON.stringify({ v: format, data });
+      try { backend.setItem(PREFIX + key, text); memory.set(key, text); unsaved.delete(key); return "kept"; }
+      catch (e) { if (noRoom(e)) return "full"; }
+      try { backend.setItem(PREFIX + "check", "1"); backend.removeItem(PREFIX + "check"); return "full"; }
+      catch { /* storage is off */ }
+      memory.set(key, text); unsaved.add(key); return "visit";
+    },
+    formatOf(key) {
+      // the format number a stored value was written in: null when nothing is stored, -1 when it is not ours
+      const text = raw(key);
+      if (text === null) return null;
+      try {
+        const box = JSON.parse(text);
+        if (box && typeof box === "object" && Number.isInteger(box.v)) return box.v;
+      } catch { /* damaged */ }
+      return -1;
     },
     remove(key) {
       memory.delete(key);

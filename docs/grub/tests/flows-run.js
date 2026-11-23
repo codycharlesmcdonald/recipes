@@ -1,11 +1,12 @@
 // Drives the real pages: loads ../index.html in a frame on the same origin, goes to an address, clicks, types
 // and reads what the page shows. Loaded only by flows.js, and only on this computer (see local-only.js),
 // because it empties and fills the site's own storage. Run with tools/run_tests.py <site> tests/flows.html
-import { haystack, narrow, chapterList, chapterOf, mergedLines, daysLabel, shortTime, totalText, timeFacts } from "../js/lib.js";
+import { haystack, narrow, chapterList, chapterOf, mergedLines, daysLabel, shortTime, totalText, timeFacts, slug } from "../js/lib.js";
 import { realIngredients } from "../js/shopping-list.js";
-import { draftFromRecipe } from "../js/recipe-format.js";
+import { draftFromRecipe, recipeFromDraft, recipeFileText } from "../js/recipe-format.js";
 import { dateValue, defaultDay } from "../js/plan.js";
 import { NOT_KEPT } from "../js/state.js";
+import { joinData, sameWords } from "../js/own.js";
 
 const frame = document.getElementById("site");
 const lines = [];
@@ -61,6 +62,7 @@ function typeKeys(el, keys) {
 const insideSite = (href) => href.startsWith("#") || !/^([a-z][a-z0-9+.-]*:|[/\\])/i.test(href);
 const linksOut = () => $$("a[href]").map((a) => a.getAttribute("href")).filter((x) => !insideSite(x));
 const focused = () => doc().activeElement;
+const hrefOf = (sel) => ($(sel) ? $(sel).getAttribute("href") : null); // null when the link is not there, so the check says so
 const noInnerScroll = (el) => [win().getComputedStyle(el).overflowY, el.scrollHeight <= el.clientHeight + 1, el.classList.contains("fits") || el.classList.contains("tall")];
 const sideways = () => Math.max(0, doc().documentElement.scrollWidth - win().innerWidth);
 const styleOf = (el) => win().getComputedStyle(el);
@@ -366,8 +368,9 @@ try {
     check("shopping: clear ticked", [items().length, said()], [wanted.length - 1, "Took 1 off the list."]);
     type($("#own-item"), "Paper towels");
     $("form.add-own").requestSubmit();
-    check("shopping: something of his own, in its own group at the end", [items().length, text($$(".shop-group h2").pop()), text(items().pop().querySelector(".nm")), $("#own-item").value],
-      [wanted.length, "Your own", "Paper towels", ""]);
+    // its heading is not "Your own": that is what the site calls the recipes he adds
+    check("shopping: something of his own, in its own group at the end, under a heading no recipe could have", [items().length, text($$(".shop-group h2").pop()), text(items().pop().querySelector(".nm")), $("#own-item").value],
+      [wanted.length, "Not from a recipe", "Paper towels", ""]);
     type($("#own-item"), "🧄");
     $("form.add-own").requestSubmit();
     type($("#own-item"), "🍋");
@@ -563,8 +566,9 @@ try {
   await flow("draft", async () => {
     await go("#/draft", "draft");
     check("draft: no drafts yet, so no list", $(".drafts"), null);
-    check("draft: says honestly that saving to the site is not built, and where the file goes",
-      [text($(".finish h2")), text($(".finish")).includes("Saving straight to the site isn't built yet."), text($(".finish")).includes("It goes in the recipes folder.")], ["Recipe file", true, true]);
+    check("draft: a finished draft is added to his recipes, and the recipe file is still there to take it further",
+      [text($(".finish h2")), $$(".finish button.primary").map(text), [...$(".finish .row").querySelectorAll("button")].map(text), text($(".finish")).includes("It goes in the recipes folder.")],
+      ["Add it to your recipes", ["Add to your recipes"], ["Add to your recipes", "Download recipe file", "Copy recipe file"], true]);
     check("draft: the form says the total time is required", text($("fieldset.time legend")), "Total time, start to finish (every recipe needs one)");
     check("draft: that some browsers clear what is kept is said to everyone, as a fact, with the one thing that always works",
       text($(".lapse")), "Some browsers clear what a site keeps on a device after a week or so without a visit. To keep a draft for good, download its recipe file.");
@@ -663,7 +667,8 @@ try {
       [rolls.title, rolls.section, "3", "25", "#/draft?copy=spring-rolls"]);
     check("draft: left alone, it is the same recipe file", JSON.stringify(JSON.parse($("#recipe-file").value)) === JSON.stringify(clean(rolls)), true);
     check("draft: a guessed time is said to be a guess", text($("#takes")).includes("This number is a guess that came with the recipe."), true);
-    check("draft: the copy note says what happens to the recipe", text($(".note p")), "This is a copy of " + rolls.title + ". Added to the site, it replaces " + rolls.title + ". Tick the box to keep both.");
+    check("draft: the copy note says what happens to the recipe", text($(".note p")),
+      "This is a copy of " + rolls.title + " from the cookbook. Added to your recipes, it is your version, kept on this device beside the cookbook's. Tick the box if it has become a different recipe.");
     await go("#/", "home");
     check("home: a copy with nothing changed is not a draft yet", doorCounts().Draft, "1 draft");
     await go("#/draft?copy=spring-rolls", "draft");
@@ -996,6 +1001,471 @@ try {
     frame.setAttribute("width", "1280");
   });
 
+  await flow("your own recipes", async () => {
+    // A finished draft is added to the site on this device, shows wherever a cookbook recipe does, marked Yours,
+    // and goes when he deletes it; a recipe file can be loaded. What this browser kept before is put back after.
+    const before = ours().map((k) => [k, localStorage.getItem(k)]);
+    const kept = (key, fallback) => { try { return JSON.parse(localStorage.getItem("grub." + key)).data; } catch { return fallback; } };
+    const mineNow = () => kept("mine", []);
+    const mineIds = () => mineNow().map((x) => x.id);
+    const starsNow = () => kept("stars", []);
+    const planIds = () => kept("plan", { items: [] }).items.map((x) => x.id);
+    const shopNames = () => kept("shopping", []).map((x) => x.name);
+    const draftTitles = () => kept("drafts", []).map((d) => d.fields.title);
+    const said = () => text($(".own-said .status"));
+    const finishSaid = () => text($(".finish .status"));
+    const ownRow = (href) => $$("ul.rows li").find((li) => li.querySelector(".row-link").getAttribute("href") === href) || null;
+    const onPage = (hash) => until("the page " + hash, () => app().dataset.page === "recipe" && app().dataset.hash === hash);
+    const newDraft = async (title) => {
+      await go("#/draft", "draft");
+      type($("#f-title"), title);
+      await until("the draft's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+      type($("#f-minutes"), "10");
+      type($("#f-ingredients"), "1 slice bread");
+      type($("#f-steps"), "Toast it.");
+      return win().location.hash;
+    };
+    const loadSaid = () => text($(".mine-list > .status"));
+    const loadLines = () => $$(".load-lines li").map(text);
+    const asFile = (name, words) => new (win().File)([words], name, { type: "application/json" });
+    const pickFiles = (files) => {
+      const dt = new (win().DataTransfer)();
+      for (const f of files) dt.items.add(f);
+      $("#load-files").files = dt.files;
+      fire($("#load-files"), "change");
+    };
+    const loaded = () => until("the files to be read", () => loadSaid() || $(".mine-list .ask"));
+    try {
+      await go("#/draft", "draft");
+      check("yours: with none of his yet, Draft's Your recipes says so the way every empty list on the site does",
+        [text($(".mine-list .empty")), $$(".mine-list ul.rows").length], ["None yet. Add a finished draft, or load a recipe file.", 0]);
+      // add it, and land on its page
+      await open(toastHash);
+      let persisted = 0;
+      if (win().navigator.storage) win().navigator.storage.persist = () => { persisted += 1; return win().Promise.resolve(true); };
+      check("yours: Draft adds a finished draft to his recipes, with one main button, and says what that does",
+        [text($(".finish h2")), $$(".finish button.primary").map(text), text($(".finish p")), $("#f-title").value],
+        ["Add it to your recipes", ["Add to your recipes"],
+          "Adding it puts the recipe into the site. It shows in Browse beside the cookbook's recipes, marked Yours, and you can star it, shop for it and plan it. It is kept on this device, and nobody else sees it.",
+          "Test Toast"]);
+      const buttonRow = button("Add to your recipes").closest(".row");
+      const airUnder = Math.round($(".finish .lasts").getBoundingClientRect().top - buttonRow.getBoundingClientRect().bottom);
+      check("yours: the line under the three buttons has air above it, as the buttons have above them", [airUnder >= 12 && airUnder <= 20, text($(".finish .lasts")).startsWith("The recipe file is the copy that lasts")],
+        [true, true]);
+      button("Add to your recipes").click();
+      await onPage("#/r/my--test-toast");
+      const toast = mineNow()[0];
+      check("yours: added, it opens on its own page, which says so and says where it is kept",
+        [win().location.hash, text($("h1")), said(), text($(".recipe-head .meta .yours")), text($(".own-line"))],
+        ["#/r/my--test-toast", "Test Toast", "Added to your recipes. It is in Browse now, marked Yours.", "Yours",
+          "This recipe is yours, not part of the cookbook. It is kept on this device, and a browser can clear what a site keeps, so the recipe file is the copy that lasts."]);
+      check("yours: it is kept as a recipe file at an address of its own, and the draft it came from is gone",
+        [mineIds(), toast.title, toast.version, toast.section, toast.tags, ["own", "_words", "pdf", "base"].filter((k) => k in toast), draftTitles().includes("Test Toast")],
+        [["my--test-toast"], "Test Toast", 1, "Snacks", ["toast", "bread"], [], false]);
+      check("yours: what he typed is only ever text on its page, and on paper it says whose recipe it is", [text($(".headnote")), $("#app img"), text($(".book-line"))],
+        ["<img src=x> & toast", null, "Your own recipe, Snacks"]);
+      check("yours: its page has Edit, its recipe file and Delete, and no tablet PDF", $$(".row.minor button, .row.minor a").map(text),
+        ["Print", "Edit", "Download recipe file", "Copy recipe file", "Delete"]);
+      check("yours: the mark sits after the time, heard as its own sentence", [text($(".recipe-head .meta")).startsWith(timeFacts(toast).ready + ". Yours."), $(".recipe-head .meta .yours").nextElementSibling.textContent],
+        [true, "."]);
+      audit("one of his own recipes");
+
+      await go("#/", "home");
+      const titleLink = $$("ul.titles a").find((a) => a.getAttribute("href") === "#/r/my--test-toast");
+      check("yours: Home counts his apart from the cookbook's and lists it under its chapter, marked",
+        [text($(".lede")), text(titleLink), doorCounts().Browse, $$("ul.chapters .chapter-name").map(text).includes("Snacks")],
+        [data.recipes.length + " recipes so far, and 1 of your own.", "Test Toast, Yours", (data.recipes.length + 1) + " recipes", true]);
+
+      // Browse and search, with the mark
+      await go("#/browse", "browse");
+      let joined = joinData(data, mineNow()).recipes;
+      const inOrder = (list) => chapterList(data.sections, joined).flatMap((c) => list.filter((r) => chapterOf(r) === c)).map((r) => r.title);
+      check("yours: Browse lists it beside the cookbook's recipes, in its own chapter, marked Yours after its time",
+        [rowTitles(), $$(".results h2").map(text).includes("Snacks"), text(ownRow("#/r/my--test-toast").querySelector(".m")), $$("ul.rows .yours").length],
+        [inOrder(joined), true, shortTime(toast) + ", Yours", 1]);
+      check("yours: the mark is drawn like the days tag: the page's own type in a thin outline, no fill, no capitals, no letter-spacing, not monospaced", (() => {
+        const s = styleOf($("ul.rows .yours"));
+        return [s.backgroundColor, s.textTransform, s.letterSpacing, /mono|courier/i.test(s.fontFamily), s.borderTopStyle, s.borderTopWidth, s.whiteSpace, s.color === styleOf($("ul.rows .t")).color];
+      })(), ["rgba(0, 0, 0, 0)", "none", "normal", false, "solid", "1px", "nowrap", false]);
+      check("yours: the mark's words are easy to read on the page", contrast(styleOf($("ul.rows .yours")).color, pageColour()) >= 4.5, true);
+      for (const typed of ["yours", "toast"]) {
+        type($("#search"), typed);
+        check("yours: searching for " + typed + " finds what it should, his recipe among it", [rowTitles(), rowTitles().includes("Test Toast")], [inOrder(narrow(joined, { query: typed })), true]);
+      }
+      type($("#search"), "");
+
+      // star it, shop for it, plan it
+      await go("#/r/my--test-toast", "recipe");
+      $(".actions button.star").click();
+      button("Add to shopping list").click();
+      $(".panel button.primary").click();
+      button("Plan a meal").click();
+      await until("the prep page", () => app().dataset.page === "prep");
+      check("yours: it can be starred, put on the shopping list and planned like any recipe, and Prep marks it",
+        [starsNow().includes("my--test-toast"), ["bread", "butter"].map((n) => shopNames().some((x) => x.toLowerCase() === n)), planIds().includes("my--test-toast"),
+          text($("ul.cooking li[data-id='my--test-toast'] .cook-name .yours"))],
+        [true, [true, true], true, "Yours"]);
+      await go("#/saved", "saved");
+      check("yours: Saved lists it, marked", $$("ul.rows li").filter((li) => li.querySelector(".yours")).map((li) => text(li.querySelector(".t"))), ["Test Toast"]);
+
+      // change it with Edit, and save the change
+      await go("#/r/my--test-toast", "recipe");
+      button("Edit").click();
+      await until("his recipe as a draft", () => app().dataset.page === "draft" && $("#f-title"));
+      check("yours: Edit opens it in Draft, which says saving puts the change into it",
+        [win().location.hash, text($(".note p")), text($("label[for=f-separate]")), text($(".finish h2")), $$(".finish button.primary").map(text), $("#f-title").value],
+        ["#/draft?copy=my--test-toast", "You are changing your recipe Test Toast. Saving replaces it with what is here. Tick the box to keep both.",
+          "Keep both: make this a separate recipe", "Save your changes", ["Save changes"], "Test Toast"]);
+      button("Save changes").click();
+      check("yours: with nothing changed there is nothing to save", [finishSaid(), mineNow()[0].version], ["Nothing is changed, so there is nothing to save.", 1]);
+      type($("#f-steps"), "Preparation:\nToast the bread.\nButter it well.");
+      await until("the draft's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+      const editFile = JSON.parse($("#recipe-file").value);
+      check("yours: its recipe file is the next version, with the plain address a cookbook file has",
+        [text($("details.help p")), editFile.id, editFile.version, ["own", "_words", "pdf", "base"].filter((k) => k in editFile)],
+        ["This is test-toast.json, version 2. It is the next version of your recipe Test Toast.", "test-toast", 2, []]);
+      button("Save changes").click();
+      await onPage("#/r/my--test-toast");
+      check("yours: saved, the page shows the change and says which version it is now; the star stays and the draft goes",
+        [said(), $$("ol.steps li").map(text), mineIds(), mineNow()[0].version, mineNow()[0].created === toast.created, starsNow().includes("my--test-toast"),
+          kept("drafts", []).some((d) => d.origin && d.origin.id === "my--test-toast")],
+        ["Saved your changes. This is version 2.", ["Toast the bread.", "Butter it well."], ["my--test-toast"], 2, true, true, false]);
+
+      // saved in another tab while this draft was open: asked first
+      button("Edit").click();
+      await until("his recipe as a draft", () => app().dataset.page === "draft" && $("#f-title"));
+      type($("#f-tips"), "Eat it hot.");
+      await until("the draft's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+      store("mine", mineNow().map((x) => (x.id === "my--test-toast" ? { ...x, version: 3, updated: "2030-01-01T00:00:00Z", yield: "2 people" } : x)));
+      button("Save changes").click();
+      const saveRow = button("Save changes").closest(".row"), question = $(".finish .ask");
+      check("yours: changed in another tab since the draft was started, it asks first, inside the page, right under the button, with the keyboard on the safe answer",
+        [text($(".finish .ask-q")), text(focused()), saveRow.nextElementSibling.contains(question), Math.round(question.getBoundingClientRect().top - saveRow.getBoundingClientRect().bottom) <= 20],
+        ["Test Toast was changed on this device after this draft was started, maybe in another tab. Save this draft over it?", "Don't save", true, true]);
+      button("Don't save").click();
+      check("yours: Don't save leaves it as the other tab saved it", [mineNow()[0].version, mineNow()[0].yield, $(".finish .ask"), focused() === button("Save changes")], [3, "2 people", null, true]);
+      button("Save changes").click();
+      // and changed once more while the question is open: Yes reads it all again, and asks about that change
+      store("mine", mineNow().map((x) => (x.id === "my--test-toast" ? { ...x, version: 4, updated: "2030-01-02T00:00:00Z", yield: "3 people" } : x)));
+      button("Yes, save over it").click();
+      check("yours: changed again while the question was open, Yes asks again about that change, and nothing is written yet",
+        [text($(".finish .ask-q")), text(focused()), mineNow()[0].version, mineNow()[0].yield, app().dataset.page],
+        ["Test Toast was changed again on this device while the question was open. Save this draft over that change too?", "Don't save", 4, "3 people", "draft"]);
+      button("Yes, save over it").click();
+      await onPage("#/r/my--test-toast");
+      check("yours: saved over it, it is the version after the one kept now, never a number already used", [said(), mineNow()[0].version, mineNow()[0].notes, "yield" in mineNow()[0]],
+        ["Saved your changes. This is version 5.", 5, ["Eat it hot."], false]);
+
+      // the same title again: never over the one he has
+      const twoHash = await newDraft("Test Toast");
+      check("yours: a new draft with the title of one of his says it is kept beside it, not over it", text($(".finish p.warn")),
+        "You already have a recipe called Test Toast. Added, this one is kept beside it, not over it. Change the title to tell them apart.");
+      button("Add to your recipes").click();
+      await onPage("#/r/my--test-toast-2");
+      check("yours: added at an address of its own; the browser is asked once to keep what the site saves",
+        [mineIds(), win().navigator.storage ? persisted : 1, twoHash !== win().location.hash], [["my--test-toast-2", "my--test-toast"], 1, true]);
+      button("Edit").click();
+      await until("his recipe as a draft", () => app().dataset.page === "draft" && $("#f-title"));
+      $("#f-separate").click();
+      await until("the separate copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+      check("yours: marked as a separate recipe, it is added, not saved over", [text($(".finish h2")), $$(".finish button.primary").map(text)], ["Add it to your recipes", ["Add to your recipes"]]);
+      button("Add to your recipes").click();
+      check("yours: one that reads word for word like one of his is not added, with a link to it",
+        [finishSaid(), $(".finish .status a").getAttribute("href"), mineIds().length, app().dataset.page],
+        ["Not added. You already have this recipe, word for word: Test Toast.", "#/r/my--test-toast-2", 2, "draft"]);
+      button("Delete this draft").click();
+      button("Yes, delete it").click();
+      await until("the list of drafts", () => app().dataset.hash === "#/draft");
+
+      // delete it, with the question asked in the page; the star and the plan entry go with it
+      await go("#/r/my--test-toast", "recipe");
+      const headWide = $(".recipe-head").getBoundingClientRect().width;
+      button("Delete").click();
+      check("yours: Delete asks first, inside the page, with the keyboard on Keep it",
+        [text($(".own-said .ask-q")), text(focused())],
+        ["Delete Test Toast from this device? It comes off Saved and out of the meal plan. Things from it on the shopping list stay. Without its recipe file it is gone for good.", "Keep it"]);
+      const asked = $(".own-said .ask").getBoundingClientRect(), things = $(".actions").getBoundingClientRect(), links = $(".row.minor").getBoundingClientRect();
+      check("yours: in a wide window the question opens in the column of the links, right under them, and the title's column keeps its width",
+        [win().innerWidth >= 1200, asked.left >= things.left - 1, asked.right <= things.right + 1, asked.top >= links.bottom - 1 && asked.top - links.bottom < 40,
+          Math.abs($(".recipe-head").getBoundingClientRect().width - headWide) < 1],
+        [true, true, true, true, true]);
+      button("Keep it").click();
+      check("yours: Keep it keeps it, and the keyboard goes back to Delete", [mineIds().includes("my--test-toast"), $(".own-said .ask"), focused() === button("Delete")], [true, null, true]);
+      const shopBefore = shopNames();
+      button("Delete").click();
+      button("Yes, delete it").click();
+      check("yours: deleted, the page says so in place with the way on, and its star and its place in the plan go with it; the shopping list stays",
+        [text($("h1")), text($("#app p")), $("#app a").getAttribute("href"), focused() === app(), mineIds(), starsNow().includes("my--test-toast"), planIds().includes("my--test-toast"), shopNames()],
+        ["Deleted", "Deleted Test Toast from this device.", "#/browse", true, ["my--test-toast-2"], false, false, shopBefore]);
+      await go("#/shopping", "shopping");
+      check("yours: its things stay on the shopping list under its name, which no longer links to a recipe that is gone",
+        $$(".shop-group h2").filter((x) => text(x) === "Test Toast").map((x) => x.querySelector("a")), [null]);
+      await go("#/browse", "browse");
+      await go("#/r/my--test-toast", "recipe");
+      check("yours: the address of one that is not on this device says it may have been deleted, where his recipes live, and where on Draft a file is loaded",
+        [text($("h1")), text($("#app p")), $$("#app a").map((a) => a.getAttribute("href"))],
+        ["Not on this device", "That recipe is not on this device. It may have been deleted, or added on another device: a recipe someone adds is kept only on the device it was added on. If you have its recipe file, load it under Your recipes, at the foot of the Draft page.",
+          ["#/draft", "#/browse"]]);
+
+      // its recipe file: downloaded and copied
+      await go("#/r/my--test-toast-2", "recipe");
+      button("Download recipe file").click();
+      const [dlName, dlWords] = await lastFile();
+      const dl = JSON.parse(dlWords);
+      check("yours: Download recipe file hands over a file the cookbook can take as it is",
+        [said(), dlName, dl.id, ["own", "_words", "pdf", "base"].filter((k) => k in dl), dl.title, dlWords.endsWith("}\n")],
+        ["Downloaded test-toast-2.json. Look in Downloads.", "test-toast-2.json", "test-toast-2", [], "Test Toast", true]);
+      check("yours: in a wide window what it says opens under the links too", $(".own-said .status").getBoundingClientRect().left >= $(".actions").getBoundingClientRect().left - 1, true);
+      let copied = null;
+      win().navigator.clipboard.writeText = async (t) => { copied = t; };
+      button("Copy recipe file").click();
+      await settled(() => said().startsWith("Copied"));
+      check("yours: Copy recipe file copies the same words", [said(), copied === dlWords], ["Copied the recipe file, test-toast-2.json.", true]);
+      delete win().navigator.clipboard.writeText;
+
+      // load it back: by the file picker and by pasting
+      await go("#/draft", "draft");
+      check("yours: Draft lists his recipes, with the way to load a recipe file; under that heading the rows need no mark to say they are his",
+        [text($(".mine-list h2")), $$(".mine-list ul.rows .row-link").map((a) => [text(a.querySelector(".t")), a.getAttribute("href"), a.querySelector(".yours")]),
+          [$("#load-files").type, $("#load-files").multiple, $("#load-files").hidden, $("#load-files").accept], Boolean(button("Load a recipe file")), text($(".mine-list summary"))],
+        ["Your recipes", [["Test Toast", "#/r/my--test-toast-2", null]], ["file", true, true, ".json,application/json"], true, "Paste a recipe file instead"]);
+      const log = $(".load-lines").parentElement;
+      check("yours: what happened to each file is a log, in the page all along, so each line is read out as it is added",
+        [log.getAttribute("role"), Boolean(log.getAttribute("aria-label")), styleOf(log).display !== "none", log.isConnected], ["log", true, true, true]);
+      let chooser = 0;
+      $("#load-files").click = () => { chooser += 1; };
+      button("Load a recipe file").click();
+      delete $("#load-files").click;
+      check("yours: Load a recipe file opens the browser's own file picker", chooser, 1);
+      audit("Draft with his recipes");
+      pickFiles([asFile("test-toast-2.json", dlWords)]);
+      await loaded();
+      check("yours: a file with the very words of one of his is not loaded twice, and says which one",
+        [loadLines(), $(".load-lines a").getAttribute("href"), loadSaid(), mineIds()],
+        [["test-toast-2.json: not loaded. You already have this recipe, word for word: Test Toast."], "#/r/my--test-toast-2", "Nothing was loaded.", ["my--test-toast-2"]]);
+      const later = (version, step) => JSON.stringify({ ...dl, version, steps: [{ section: "", items: [step] }] }, null, 2) + "\n";
+      pickFiles([asFile("toast-v2.json", later(2, "Toast it twice."))]);
+      await loaded();
+      check("yours: a file for an address he already has asks before it goes over it, with the keyboard on Keep both",
+        [text($(".mine-list .ask-q")), text(focused())],
+        ["You already have Test Toast on this device (version 1). Replace it with the one in the file (version 2)?", "Keep both"]);
+      button("Keep both").click();
+      await until("the file to be loaded", () => loadSaid());
+      check("yours: Keep both loads it at an address of its own, says there are two now, and lists it",
+        [loadLines(), loadSaid(), mineIds(), focused() === button("Load a recipe file"), $$(".mine-list ul.rows .row-link").map((a) => a.getAttribute("href"))],
+        [["toast-v2.json: loaded as Test Toast. You now have two recipes called Test Toast."], "Loaded 1 recipe.", ["my--test-toast-2-2", "my--test-toast-2"], true,
+          ["#/r/my--test-toast-2", "#/r/my--test-toast-2-2"]]);
+      pickFiles([asFile("toast-v3.json", later(3, "Toast it three times."))]);
+      await loaded();
+      button("Replace it").click();
+      await until("the file to be loaded", () => loadSaid());
+      const replaced = mineNow().find((x) => x.id === "my--test-toast-2");
+      check("yours: Replace it puts the file's recipe in place of the one he had, at the same address",
+        [loadLines(), mineIds(), replaced.version, replaced.steps[0].items],
+        [["toast-v3.json: loaded as Test Toast. It is in place of the one you had."], ["my--test-toast-2-2", "my--test-toast-2"], 3, ["Toast it three times."]]);
+      $(".mine-list summary").click();
+      button("Load what is pasted").click();
+      check("yours: an empty paste box says what to do", [loadSaid(), focused() === $("#paste-file")], ["Paste the words of a recipe file first.", true]);
+      type($("#paste-file"), recipeFileText(clean(padThai)));
+      button("Load what is pasted").click();
+      await loaded();
+      check("yours: pasted words of a cookbook recipe, word for word, are not loaded, with a link to it, and stay in the box",
+        [loadLines(), $(".load-lines a").getAttribute("href"), $("#paste-file").value === recipeFileText(clean(padThai))],
+        [["Pasted words: not loaded. The cookbook already has this recipe, word for word: " + padThai.title + "."], "#/r/pad-thai-baby", true]);
+      const otherIds = [], idsBefore = mineIds();
+      for (const id of ["a-copy-of-it", "Pad Thai", ""]) {
+        type($("#paste-file"), recipeFileText({ ...clean(padThai), id }));
+        button("Load what is pasted").click();
+        await loaded();
+        otherIds.push([loadLines(), $(".load-lines a") && $(".load-lines a").getAttribute("href")]);
+      }
+      check("yours: the very words of a cookbook recipe under another id, or none, are not loaded either, with a link to the cookbook's",
+        [otherIds, mineIds()], [Array(3).fill([["Pasted words: not loaded. The cookbook already has this recipe, word for word: " + padThai.title + "."], "#/r/pad-thai-baby"]), idsBefore]);
+      type($("#paste-file"), "{ not a recipe");
+      button("Load what is pasted").click();
+      await loaded();
+      check("yours: words that are not a recipe file say so", loadLines(), ["Pasted words: not loaded. It is not a recipe file from this site."]);
+      type($("#paste-file"), JSON.stringify({ ...dl, id: "pasted-toast", title: "Pasted Toast" }));
+      button("Load what is pasted").click();
+      await loaded();
+      check("yours: a recipe file pasted in is loaded, the box is emptied, and the keyboard is back on the button",
+        [loadLines(), loadSaid(), mineIds()[0], $("#paste-file").value, focused() === button("Load what is pasted")],
+        [["Pasted words: loaded as Pasted Toast."], "Loaded 1 recipe.", "my--pasted-toast", "", true]);
+      // a file made to do harm, one with two recipes, one far too big, and more files than are read at once
+      const hostile = "{\"__proto__\": {\"polluted\": true}, " + JSON.stringify({ schema: 1, id: "../../etc/passwd", version: 1, title: "<img src=x onerror=alert(1)> Toast‮",
+        total_minutes: 5, pdf: "javascript:alert(1)", own: false, _words: ["zzz"], evil: "x", tags: ["<b>bold</b>"],
+        ingredients: [{ section: "<i>", items: [{ qty: "1", unit: "", name: "bread", note: "" }] }], steps: [{ section: "", items: ["Toast it <script>alert(1)</script>."] }] }).slice(1);
+      const junk = Array.from({ length: 23 }, (_, n) => asFile("junk-" + n + ".json", "nope"));
+      pickFiles([asFile("hostile.json", hostile), asFile("two.json", JSON.stringify([clean(padThai), clean(burgers)])), asFile("big.json", "x".repeat(700000)), ...junk]);
+      await loaded();
+      const bad = mineNow().find((x) => x.title.startsWith("<img"));
+      check("yours: each file is answered on its own line, and only the first 25 are read",
+        [loadLines().slice(0, 4), loadLines().length, loadSaid()],
+        [["hostile.json: loaded as <img src=x onerror=alert(1)> Toast.", "two.json: not loaded. It holds more than one recipe. Load one recipe file at a time.",
+          "big.json: not loaded. It is too big to be a recipe file. The most is 200,000 characters.", "junk-0.json: not loaded. It is not a recipe file from this site."],
+        25, "Loaded 1 recipe. 24 files were not loaded. Only the first 25 files were read."]);
+      check("yours: a file made to do harm is kept as words only: no address, PDF, mark or other key from the file, nothing put on the page as markup, nothing added to every object",
+        [bad.id, Object.keys(bad).filter((k) => !["schema", "id", "version", "created", "updated", "title", "total_minutes", "tags", "ingredients", "steps"].includes(k)), $("#app img"), $("#app script"),
+          win().Object.prototype.polluted, ({}).polluted],
+        ["my--img-src-x-onerror-alert-1-toast", [], null, null, undefined, undefined]);
+      await go("#/r/my--img-src-x-onerror-alert-1-toast", "recipe");
+      check("yours: and its page shows those words as words", [text($("h1")), $("#app img"), $("#app script"), $$("ol.steps li").map(text), linksOut()],
+        ["<img src=x onerror=alert(1)> Toast", null, null, ["Toast it <script>alert(1)</script>."], []]);
+
+      // A word-for-word copy is found by its words, so a separate copy of a cookbook recipe whose address is not
+      // its title's slug is caught too. One is picked from the cookbook, if it has one that Draft gives back word
+      // for word.
+      const unslugged = data.recipes.find((r) => slug(r.title) !== r.id && sameWords(recipeFromDraft({ ...draftFromRecipe(r, "dx", 0), separate: true }, "2030-01-02T03:04:05Z"), r));
+      if (unslugged) {
+        store("drafts", kept("drafts", []).filter((x) => !(x.origin && x.origin.id === unslugged.id))); // a changed copy left by an earlier flow is not this one
+        await go("#/r/" + unslugged.id, "recipe");
+        button("Edit a copy as a draft").click();
+        await until("the copy", () => app().dataset.page === "draft" && $("#f-title"));
+        $("#f-separate").click();
+        await until("the separate copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+        const idsNow = mineIds();
+        button("Add to your recipes").click();
+        check("yours: a separate copy, word for word, of a cookbook recipe whose address is not its title's slug is not added, with a link to it",
+          [finishSaid(), hrefOf(".finish .status a"), mineIds(), app().dataset.page],
+          ["Not added. This reads word for word like " + unslugged.title + " in the cookbook. Change something first.", "#/r/" + unslugged.id, idsNow, "draft"]);
+        if (button("Delete this draft")) {
+          button("Delete this draft").click();
+          button("Yes, delete it").click();
+          await until("the list of drafts", () => app().dataset.hash === "#/draft");
+        }
+      } else {
+        say("info no cookbook recipe has an address other than its title's slug, so a copy under another address was not tried");
+      }
+
+      // a changed copy of a cookbook recipe is kept beside it, and each page links to the other
+      await go("#/r/pad-thai-baby", "recipe");
+      button("Edit a copy as a draft").click();
+      await until("the copy", () => app().dataset.page === "draft" && $("#f-title"));
+      check("yours: a copy of a cookbook recipe says it is kept beside the cookbook's, and with no version of his own yet there is nothing to warn about",
+        [text($(".note p")), text($("label[for=f-separate]")), text($(".finish h2")), $(".finish p.warn").hidden],
+        ["This is a copy of " + padThai.title + " from the cookbook. Added to your recipes, it is your version, kept on this device beside the cookbook's. Tick the box if it has become a different recipe.",
+          "Make this a separate recipe", "Add it to your recipes", true]);
+      button("Add to your recipes").click();
+      check("yours: unchanged, there is nothing to add", finishSaid(), "Nothing is changed, so there is nothing to add. The cookbook already has this recipe.");
+      $("#f-separate").click();
+      await until("the separate copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+      check("yours: marked separate with the cookbook's title, it says it would be kept beside it", text($(".finish p.warn")),
+        "The cookbook has a recipe called " + padThai.title + ". Added, this one is kept beside it as your version. Change the title to make it a recipe of its own.");
+      button("Add to your recipes").click();
+      check("yours: a word-for-word copy of a cookbook recipe is not added, with a link to it",
+        [finishSaid(), $(".finish .status a").getAttribute("href"), mineIds().includes("my--pad-thai-baby")],
+        ["Not added. This reads word for word like " + padThai.title + " in the cookbook. Change something first.", "#/r/pad-thai-baby", false]);
+      $("#f-separate").click();
+      type($("#f-headnote"), "My way, with more lime.");
+      await until("the copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+      check("yours: a changed copy's file still goes into the cookbook in place of the recipe", text($("details.help p")),
+        "This is " + padThai.id + ".json, version " + (padThai.version + 1) + ". It is a changed copy of " + padThai.title + ". If it goes into the cookbook, it replaces " + padThai.title + " there.");
+      button("Add to your recipes").click();
+      await onPage("#/r/my--pad-thai-baby");
+      check("yours: a changed copy is kept beside the cookbook's as his version, and its page links to the cookbook's",
+        [said(), $$(".own-line").map(text)[1], $$(".own-line a").map((a) => a.getAttribute("href")), mineNow()[0].base, mineNow()[0].version, text($("h1"))],
+        ["Added to your recipes. It is in Browse now, marked Yours.", "It is your version of " + padThai.title + ", which is in the cookbook.", ["#/r/pad-thai-baby"], padThai.id,
+          padThai.version + 1, padThai.title]);
+      await go("#/r/pad-thai-baby", "recipe");
+      check("yours: the cookbook's page says he has a version of his own, with a link to it, and has no Delete",
+        [text($(".own-line")), $(".own-line a").getAttribute("href"), $(".own-said"), button("Delete")],
+        ["You have your own version of this on this device: " + padThai.title + ".", "#/r/my--pad-thai-baby", null, null]);
+      // another changed copy of it: Draft says before adding that it would be kept beside his version, not over it
+      button("Edit a copy as a draft").click();
+      await until("the copy", () => app().dataset.page === "draft" && $("#f-title"));
+      type($("#f-headnote"), "Another way, with tamarind.");
+      await until("the copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+      check("yours: a changed copy of a cookbook recipe he already has a version of says, before it is added, that it is kept beside his version, with a link to that",
+        [text($(".finish p.warn")), $(".finish p.warn").hidden, hrefOf(".finish p.warn a")],
+        ["You already have your own version of this recipe: " + padThai.title + ". Added, this one is kept beside it, not over it. To change yours, open it and press Edit.", false, "#/r/my--pad-thai-baby"]);
+      button("Delete this draft").click();
+      button("Yes, delete it").click();
+      await until("the list of drafts", () => app().dataset.hash === "#/draft");
+      await go("#/browse", "browse");
+      check("yours: Browse lists both, his marked", $$("ul.rows li").filter((li) => text(li.querySelector(".t")) === padThai.title)
+        .map((li) => [li.querySelector(".row-link").getAttribute("href"), Boolean(li.querySelector(".yours"))]), [["#/r/pad-thai-baby", false], ["#/r/my--pad-thai-baby", true]]);
+      await go("#/prep", "prep");
+      check("yours: Prep's list to pick from marks his", $$("#plan-pick option").filter((o) => o.value.startsWith("my--pad")).map((o) => o.textContent), [padThai.title + " (yours)"]);
+
+      // the cookbook later takes in the very same words: his copy says so, with Delete right there
+      store("mine", mineNow().map((x) => (x.id === "my--pad-thai-baby" ? { ...clean(padThai), id: "my--pad-thai-baby", version: 1, base: padThai.id } : x)));
+      await go("#/r/my--pad-thai-baby", "recipe");
+      const sameLine = $$(".own-line")[1];
+      check("yours: when the cookbook has the same words, his page says he can delete his copy, with the button right there",
+        [text(sameLine.querySelector("span")), text(sameLine.querySelector("button"))], ["The cookbook has this recipe now, word for word. You can delete your copy.", "Delete your copy"]);
+      button("Delete your copy").click();
+      check("yours: and it asks first, right under that line, where the button is", [text(focused()), Boolean($(".recipe-head .own-ask .ask")), $(".own-said .ask")], ["Keep it", true, null]);
+      button("Yes, delete it").click();
+      check("yours: and deletes it", [text($("h1")), mineIds().includes("my--pad-thai-baby")], ["Deleted", false]);
+
+      // No room left on the device: nothing changes, and the draft stays. A full device refuses every write, the
+      // smallest too (a draft saved on every key uses up the last of the room), and that is still no room, not
+      // storage switched off.
+      const fullHash = await newDraft("Full Toast");
+      const proto = win().Storage.prototype, realSet = proto.setItem;
+      proto.setItem = function () { throw new (win().DOMException)("no room", "QuotaExceededError"); };
+      const mineWas = localStorage.getItem("grub.mine");
+      try {
+        button("Add to your recipes").click();
+        check("yours: with no room left for it nothing changes, and the draft stays",
+          [finishSaid(), localStorage.getItem("grub.mine") === mineWas, app().dataset.page, draftTitles().includes("Full Toast")],
+          ["Not added. There is no room left for it on this device. The draft is still here. Download the recipe file to keep it, or delete a recipe or a draft you no longer need and try again.", true, "draft", true]);
+        await go("#/browse", "browse");
+        check("yours: and it is not in Browse, not even for the visit", rowTitles().includes("Full Toast"), false);
+        await go("#/draft", "draft");
+        pickFiles([asFile("roomy.json", JSON.stringify({ ...dl, id: "roomy-toast", title: "Roomy Toast" }))]);
+        await loaded();
+        check("yours: a file is not loaded either", [loadLines(), localStorage.getItem("grub.mine") === mineWas], [["roomy.json: not loaded. There is no room left for it on this device."], true]);
+      } finally { proto.setItem = realSet; }
+      await go("#/prep", "prep"); // a page that saves: anything held back for the visit would be written now
+      check("yours: and once there is room again, nothing held back from then is written over his recipes", localStorage.getItem("grub.mine") === mineWas, true);
+
+      // Saved by a newer version of the site: every page says to reload, and his recipes are never written over.
+      // Prep cannot show his planned recipes until the reload, and keeps their places in the plan meanwhile.
+      store("plan", { items: [{ id: "my--planned-toast", minutes: null }, { id: padThai.id, minutes: null }], date: "", time: "18:30", alarm: "10", dayChosen: false });
+      localStorage.setItem("grub.mine", JSON.stringify({ v: 2, data: { later: true } }));
+      const newer = "Your recipes on this device were saved by a newer version of this site. Reload the page to see them.";
+      const newerSaid = [];
+      for (const [hash, page] of [["#/", "home"], ["#/browse", "browse"], ["#/r/pad-thai-baby", "recipe"], ["#/prep", "prep"], [fullHash, "draft"]]) {
+        await go(hash, page);
+        newerSaid.push([page, text($(".newer")), $$(".yours").length]);
+        if (page === "prep") {
+          type($("#plan-time"), "19:00"); // a change to the plan, saved at once
+          newerSaid.push([$$("ul.cooking li").map((li) => li.dataset.id), planIds()]);
+        }
+      }
+      check("yours: a newer format is never read; every page says to reload, and Prep keeps his planned recipes in the plan though it cannot show them",
+        newerSaid, [["home", newer, 0], ["browse", newer, 0], ["recipe", newer, 0], ["prep", newer, 0], [[padThai.id], [padThai.id, "my--planned-toast"]], ["draft", newer, 0]]);
+      button("Add to your recipes").click();
+      check("yours: and nothing is written over it", [finishSaid(), localStorage.getItem("grub.mine")],
+        ["Not added. A newer version of this site has been used in this browser. Reload the page and try again. The draft is still here.", JSON.stringify({ v: 2, data: { later: true } })]);
+      store("mine", [{ ...dl, id: "my--planned-toast", title: "Planned Toast" }]);
+      await go("#/prep", "prep");
+      check("yours: once his recipes can be read again, Prep shows the one it kept a place for", $$("ul.cooking li").map((li) => li.dataset.id), [padThai.id, "my--planned-toast"]);
+      await go(fullHash, "draft");
+
+      // 200 is the most a device keeps
+      store("mine", Array.from({ length: 200 }, (_, n) => ({ ...dl, id: "my--cap-" + n, title: "Cap " + n })));
+      button("Add to your recipes").click();
+      check("yours: no more than 200 on one device", [finishSaid(), mineNow().length],
+        ["Not added. This device already holds 200 of your recipes, the most the site keeps. Delete one you no longer need, or download this one's recipe file.", 200]);
+
+      // a damaged value is dropped, entry by entry, and the next add starts afresh
+      store("mine", [{ title: "Broken" }, "junk", null, { ...dl, id: "my--whole", title: "Whole" }, { ...dl, id: "pad-thai-baby", title: "Not his address" }]);
+      await go("#/browse", "browse");
+      check("yours: a damaged entry is left out and the rest still show", $$("ul.rows .yours").map((m) => text(m.closest("li").querySelector(".t"))), ["Whole"]);
+      localStorage.setItem("grub.mine", "not a stored value");
+      await go(fullHash, "draft");
+      button("Add to your recipes").click();
+      await onPage("#/r/my--full-toast");
+      check("yours: a stored value that is not his recipes at all is replaced by the next one added", mineIds(), ["my--full-toast"]);
+    } finally {
+      wipe();
+      for (const [k, v] of before) localStorage.setItem(k, v);
+      await open("#/");
+    }
+  });
+
   await flow("long words", async () => {
     // one long unbroken word (a pasted link) must wrap, in a computer window too
     const link = "https://example.com/" + "x".repeat(84);
@@ -1072,6 +1542,9 @@ try {
 
   await flow("storage switched off", async () => {
     // a browser that will not save: the pages work for the visit and do not claim anything is kept
+    // (one of his recipes was kept on an earlier visit, before the browser stopped saving)
+    store("mine", [{ schema: 1, id: "my--kept-toast", version: 1, created: "2030-01-02T03:04:05Z", updated: "2030-01-02T03:04:05Z", title: "Kept Toast", total_minutes: 5, tags: [],
+      ingredients: [{ section: "", items: [{ qty: "1", unit: "slice", name: "bread", note: "" }] }], steps: [{ section: "", items: ["Toast it."] }] }]);
     const proto = win().Storage.prototype, realSet = proto.setItem;
     proto.setItem = function () { throw new Error("blocked by the test"); };
     try {
@@ -1083,6 +1556,34 @@ try {
       check("not kept: Draft says so, and does not go on about what browsers clear later", [text($(".lede")).endsWith(NOT_KEPT), text($(".lede")).includes("saves itself"), $(".lapse")], [true, false, null]);
       await go("#/prep", "prep");
       check("not kept: Prep says so", [text($(".plan-note")).startsWith(NOT_KEPT), text($(".plan-note")).includes("kept on this device")], [true, false]);
+      // a finished draft is added for the visit only, and the draft stays, since nothing else holds its words
+      await go("#/draft", "draft");
+      type($("#f-title"), "Visit Toast");
+      type($("#f-minutes"), "10");
+      type($("#f-ingredients"), "1 slice bread");
+      type($("#f-steps"), "Toast it.");
+      check("not kept: Draft does not say an added recipe is kept", text($(".finish p")).endsWith(NOT_KEPT), true);
+      button("Add to your recipes").click();
+      check("not kept: added for the visit only, said plainly, with a link to it, and the draft stays",
+        [text($(".finish .status")), $(".finish .status a").getAttribute("href"), app().dataset.page, $("#f-title").value],
+        ["This browser is not letting the site save anything, so the recipe is in the site only until the page is closed or reloaded. The draft is still here. Download the recipe file to keep it. See the recipe",
+          "#/r/my--visit-toast", "draft", "Visit Toast"]);
+      await go("#/browse", "browse");
+      check("not kept: Browse lists it for the visit, marked", [rowTitles().includes("Visit Toast"), $$("ul.rows .yours").map((m) => text(m.closest("li").querySelector(".t")))],
+        [true, ["Kept Toast", "Visit Toast"]]);
+      await go("#/r/my--visit-toast", "recipe");
+      check("not kept: its page does not claim it is kept", text($(".own-line")), "This recipe is yours, not part of the cookbook. " + NOT_KEPT + " Download its recipe file to keep it.");
+      // deleted: one kept on an earlier visit comes back after a reload, and the page says so; one added on this
+      // visit was never kept, so it is simply deleted
+      const deleted = [];
+      for (const id of ["my--kept-toast", "my--visit-toast"]) {
+        await go("#/r/" + id, "recipe");
+        button("Delete").click();
+        button("Yes, delete it").click();
+        deleted.push(text($("#app p")));
+      }
+      check("not kept: a delete says it lasts for the visit only when the recipe is kept on the device and will be back after a reload",
+        deleted, ["Deleted Kept Toast for this visit. " + NOT_KEPT, "Deleted Visit Toast."]);
     } finally { proto.setItem = realSet; }
     await go("#/shopping", "shopping");
     await go("#/prep", "prep");
@@ -1096,6 +1597,10 @@ try {
     frame.setAttribute("height", "844");
     const link = "https://example.com/" + "x".repeat(84);
     store("drafts", [{ id: "dlong", touched: 5, fields: { title: "W".repeat(300), ingredients: "2 cups " + link, steps: "Open " + link, tips: link, headnote: link } }]);
+    // one of his own, as long as its words can be, beside the cookbook recipe it is a version of
+    store("mine", [{ schema: 1, id: "my--test-toast", version: 1, created: "2030-01-02T03:04:05Z", updated: "2030-01-02T03:04:05Z", title: "Test Toast " + "W".repeat(150),
+      section: "Snacks", headnote: link, total_minutes: 2000, days: 2, tags: ["toast"], ingredients: [{ section: "", items: [{ qty: "2", unit: "slices", name: "bread " + link, note: "" }] }],
+      steps: [{ section: "", items: ["Open " + link] }], base: "pad-thai-baby" }]);
     await open("#/r/pad-thai-baby");
     $(".actions button.star").click();
     button("Add to shopping list").click();
@@ -1124,7 +1629,7 @@ try {
       [true, 12, "fixed", true, true, 0, [0, true], true, 0]);
     delete win().navigator.clipboard.writeText; // the browser's own again
     const hashes = [["#/", "home"], ["#/browse", "browse"], ["#/saved", "saved"], ["#/shopping", "shopping"], ["#/prep", "prep"], ["#/draft", "draft"], ["#/draft/dlong", "draft"],
-      ["#/r/pad-thai-baby", "recipe"], ["#/r/grilled-cheese", "recipe"],
+      ["#/r/pad-thai-baby", "recipe"], ["#/r/grilled-cheese", "recipe"], ["#/r/my--test-toast", "recipe"],
       ["#/r/larp-chicken-and-sticky-rice", "recipe"], ["#/browse?time=days", "browse"], ["#/draft?copy=larp-chicken-and-sticky-rice", "draft"]];
     const wide = [], small = [];
     for (const [hash, page] of hashes) {

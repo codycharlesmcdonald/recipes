@@ -10,6 +10,7 @@ import { addFromRecipe, addOwn, setGot, removeItem, clearTicked, counts, groups,
 import { emptyPlan, addToPlan, removeFromPlan, setPlanMinutes, usableMinutes, realTime, cleanPlan, planEntries, longestMinutes, planLines, startWhen,
   mealMsOf, dateValue, defaultDay, planDay } from "../js/plan.js";
 import { makeStore, PREFIX } from "../js/store.js";
+import * as own from "../js/own.js";
 import { localOnly } from "./local-only.js";
 
 const lines = [];
@@ -515,7 +516,7 @@ for (const name of site.files) {
   }
 }
 say("info the sweep read " + site.files.length + " files: " + site.how);
-check("the sweep covers the page, the styles, the recipes and every script", ["index.html", "css/site.css", "data/recipes.json", "manifest.webmanifest", "js/app.js", "js/lib.js", "js/pages/shopping.js", "js/pages/prep.js"]
+check("the sweep covers the page, the styles, the recipes and every script", ["index.html", "css/site.css", "data/recipes.json", "manifest.webmanifest", "js/app.js", "js/lib.js", "js/own.js", "js/pages/shopping.js", "js/pages/prep.js"]
   .filter((name) => !site.files.includes(name)), []);
 check("no file of the site holds a shortcuts: address or the words Shortcut or Reminders", sweep, []);
 
@@ -718,6 +719,258 @@ if (site.how === "every file in the folder") {
 } else {
   say("info the pdf folder was not listed (this page was not opened through tools/run_tests.py), so left-over PDFs were not looked for");
 }
+
+/* ---------- sixth version: his own recipes, kept on this device beside the cookbook's ---------- */
+
+const mine1 = (over = {}) => ({ schema: 1, id: "my--toast", version: 1, created: NOW, updated: NOW, title: "Toast", total_minutes: 5, tags: [],
+  ingredients: [{ section: "", items: [{ qty: "1", unit: "slice", name: "bread", note: "" }] }], steps: [{ section: "", items: ["Toast it."] }], ...over });
+const gate = (x) => own.cleanRecipe(x, NOW);
+
+// addresses: a cookbook id never has "--", so "my--" and a plain id can never be one, now or later
+check("own ids: a plain id is the cookbook's own shape, 60 characters at most",
+  ["toast", "a-b-2", "a--b", "-a", "a-", "A", "", "x".repeat(60), "x".repeat(61), 5, null].map(own.isPlainId),
+  [true, true, false, false, false, false, false, true, false, false, false]);
+check("own ids: his addresses are my-- and a plain id", ["my--toast", "my--", "my---toast", "my--a--b", "my--" + "x".repeat(60), "my--" + "x".repeat(61), "toast", "my-toast"].map(own.isOwnId),
+  [true, false, false, false, true, false, false, false]);
+check("own ids: the plain part", [own.plainId("my--toast"), own.plainId("toast"), own.plainId("my--a--b")], ["toast", "toast", "my--a--b"]);
+check("own ids: no cookbook id and no title's slug could ever be one of his addresses",
+  [data.recipes.filter((x) => !own.isPlainId(x.id) || own.isOwnId(x.id)).map((x) => x.id), data.recipes.filter((x) => !own.isPlainId(slug(x.title))).map((x) => x.id),
+    [slug("Toast -- for two"), slug("my--toast"), slug("My -- Toast")]],
+  [[], [], ["toast-for-two", "my-toast", "my-toast"]]);
+check("own ids: the address of one of his opens a recipe page", parseRoute("#/r/my--toast").name + " " + parseRoute("#/r/my--toast").arg, "recipe my--toast");
+const sixty = "x".repeat(60);
+check("own ids: the first free address, then -2, -3; a long one is cut to fit; one with nothing plain is a recipe",
+  [own.freeOwnId("toast", []), own.freeOwnId("toast", ["my--toast"]), own.freeOwnId("toast", ["my--toast", "my--toast-2"]),
+    own.freeOwnId(sixty, ["my--" + sixty]), own.isOwnId(own.freeOwnId(sixty, ["my--" + sixty])), own.freeOwnId("", []), own.freeOwnId("Not An Id", ["my--recipe"])],
+  ["my--toast", "my--toast-2", "my--toast-3", "my--" + "x".repeat(58) + "-2", true, "my--recipe", "my--recipe-2"]);
+check("own ids: a cut that would end on a hyphen does not", own.freeOwnId("x".repeat(57) + "-yy", ["my--" + "x".repeat(57) + "-yy"]), "my--" + "x".repeat(57) + "-2");
+
+// the gate: every cookbook recipe comes through it word for word, so the limits are far above anything real
+check("gate: every cookbook recipe comes through word for word (only the address and the PDF are left behind)",
+  data.recipes.filter((x) => JSON.stringify(gate(x).recipe) !== JSON.stringify({ ...clean(x), id: "" })).map((x) => x.id), []);
+check("gate: one of his comes through as it is, in the files' key order", JSON.stringify(gate(mine1({ base: "pad-thai-baby" })).recipe), JSON.stringify(mine1({ base: "pad-thai-baby" })));
+const proto = Object.create({ title: "Inherited", total_minutes: 5, ingredients: mine1().ingredients, steps: mine1().steps });
+check("gate: only a value's own fields are read", gate(proto).problems, [own.NO_TITLE, own.NO_TIME, own.NO_INGREDIENT, own.NO_STEP]);
+const sneaky = gate(JSON.parse("{\"__proto__\": {\"polluted\": true}, \"title\": \"Toast\", \"total_minutes\": 5, \"ingredients\": [{\"section\": \"\", \"items\": [{\"name\": \"bread\"}]}], \"steps\": [{\"section\": \"\", \"items\": [\"Toast it.\"]}], \"pdf\": \"pdf/x-v1.pdf\", \"own\": true, \"_words\": [\"x\"], \"evil\": 1}")).recipe;
+check("gate: a new object of the named fields only: no pdf, own, _words or any other key, and nothing from __proto__",
+  [Object.keys(sneaky), Object.getPrototypeOf(sneaky) === Object.prototype, ({}).polluted, sneaky.polluted, sneaky.ingredients[0].items[0]],
+  [["schema", "id", "version", "created", "updated", "title", "total_minutes", "tags", "ingredients", "steps"], true, undefined, undefined, { qty: "", unit: "", name: "bread", note: "" }]);
+check("gate: a value that is not a recipe object", [gate(null), gate([]), gate("Toast"), gate(5)].map((x) => [x.recipe, x.problems]), Array(4).fill([null, [own.NOT_A_FILE]]));
+check("gate: what is missing is said in plain sentences, all at once", gate({ title: "  " }).problems, [own.NO_TITLE, own.NO_TIME, own.NO_INGREDIENT, own.NO_STEP]);
+check("gate: a total time must be a whole number of minutes from 1 up to two weeks",
+  [0, -5, 1.5, "50", MAX_MINUTES + 1, null].map((n) => gate(mine1({ total_minutes: n })).problems), Array(6).fill([own.NO_TIME]));
+check("gate: two weeks is fine", gate(mine1({ total_minutes: MAX_MINUTES, days: MAX_DAYS })).recipe.total_minutes, MAX_MINUTES);
+check("gate: a later recipe format is not read, and a format that is not a number is not a recipe file",
+  [gate(mine1({ schema: 2 })).problems, gate(mine1({ schema: "1" })).problems, gate(mine1({ schema: 1 })).problems], [[own.NEWER_FORMAT], [own.NOT_A_FILE], []]);
+check("gate: control characters become a space and direction marks go, in every line of text",
+  [gate(mine1({ title: " A\u0000B C‮D⁦E " })).recipe.title, gate(mine1({ steps: [{ section: "Now\u0007", items: ["Go\u001b go"] }] })).recipe.steps],
+  ["A B CDE", [{ section: "Now", items: ["Go  go"] }]]);
+check("gate: the headnote keeps its line breaks", gate(mine1({ headnote: "one\ntwo\r\nthree\rfour\u0000five" })).recipe.headnote, "one\ntwo\nthree\nfour five");
+check("gate: empty lines, empty items and items with no name go; an empty group goes",
+  gate(mine1({ tags: ["a", " ", 5], ingredients: [{ section: "", items: [{ name: " " }, "x", { qty: "1", name: "egg" }] }, { section: "Empty", items: [] }], notes: ["", "Tip"] })).recipe,
+  { ...mine1(), tags: ["a"], ingredients: [{ section: "", items: [{ qty: "1", unit: "", name: "egg", note: "" }] }], notes: ["Tip"] });
+check("gate: a joke line counts as an ingredient, as it does in Draft and in tools/build.py",
+  gate(mine1({ ingredients: [{ section: "", items: [{ name: "a toaster", aside: true }] }] })).recipe.ingredients, [{ section: "", items: [{ qty: "", unit: "", name: "a toaster", note: "", aside: true }] }]);
+check("gate: the days are raised to what the time needs, and a number of days out of range counts as the same day",
+  [gate(mine1({ total_minutes: 2000 })).recipe.days, gate(mine1({ total_minutes: 5, days: 20 })).recipe.days, gate(mine1({ total_minutes: 5, days: 3 })).recipe.days],
+  [2, undefined, 3]);
+check("gate: hands-on time longer than the total is left out; a guess stays a guess only when it says true",
+  [gate(mine1({ active_minutes: 9 })).recipe.active_minutes, gate(mine1({ active_minutes: 4 })).recipe.active_minutes,
+    gate(mine1({ total_minutes_estimated: true })).recipe.total_minutes_estimated, gate(mine1({ total_minutes_estimated: "yes" })).recipe.total_minutes_estimated],
+  [undefined, 4, true, undefined]);
+check("gate: the address is kept only when it is one of his; base only when it is a plain id",
+  [gate(mine1({ id: "toast" })).recipe.id, gate(mine1({ id: "my--a--b" })).recipe.id, gate(mine1({ base: "my--x" })).recipe.base, gate(mine1({ base: "../x" })).recipe.base, gate(mine1({ base: "pad-thai-baby" })).recipe.base],
+  ["", "", undefined, undefined, "pad-thai-baby"]);
+check("gate: a version that is not a whole number from 1 is version 1; a date that is not a date is now",
+  [gate(mine1({ version: 0 })).recipe.version, gate(mine1({ version: 1e7 })).recipe.version, gate(mine1({ version: 3 })).recipe.version,
+    gate(mine1({ created: "yesterday", updated: "2030-02-30T00:00:00Z" })).recipe.created, gate(mine1({ created: "2029-12-31T00:00:00Z" })).recipe.created],
+  [1, 1, 3, NOW, "2029-12-31T00:00:00Z"]);
+check("gate: anything over a limit is refused, never cut short",
+  [gate(mine1({ title: "t".repeat(201) })), gate(mine1({ headnote: "h".repeat(2001) })), gate(mine1({ steps: [{ section: "", items: Array(201).fill("Stir.") }] })),
+    gate(mine1({ tags: Array(31).fill("tag") }))].map((x) => [x.recipe, x.problems]),
+  [[null, ["The title is too long. The most the site keeps is 200 characters."]], [null, ["The headnote is too long. The most the site keeps is 2,000 characters."]],
+    [null, ["There are too many steps. The most the site keeps is 200."]], [null, ["There are too many tags. The most the site keeps is 30."]]]);
+check("gate: right at the limits is fine", gate(mine1({ title: "t".repeat(200), steps: [{ section: "", items: Array(200).fill("Stir.") }] })).problems, []);
+const huge = gate(mine1({ ingredients: [{ section: "", items: Array(300).fill({ qty: "", unit: "", name: "n".repeat(300), note: "o".repeat(300) }) }] }));
+check("gate: a recipe whose file would be over 200,000 characters is refused", [huge.recipe, huge.problems], [null, [own.TOO_LONG]]);
+// Right at the size limit. It is measured in the longest form a recipe can take (kept at the longest address
+// with the longest base), so one that passes still fits wherever it is kept, and its recipe file loads back.
+const longestForm = (r) => JSON.stringify({ ...r, id: own.OWN_MARK + "x".repeat(own.MAX_ID), base: "x".repeat(own.MAX_ID) }, null, 2).length + 1;
+function atSize(n) {
+  const r = mine1({ id: "", ingredients: [{ section: "", items: Array.from({ length: 300 }, () => ({ qty: "", unit: "", name: "n".repeat(300), note: "" })) }],
+    notes: Array.from({ length: own.LIMITS.notes }, () => "t".repeat(own.LIMITS.tip)) });
+  let over = longestForm(r) - n; // too long as made; the tips are cut, the last first, until it is exactly n
+  for (let i = r.notes.length - 1; over > 0 && i >= 0; i -= 1) { const cut = Math.min(over, r.notes[i].length - 1); r.notes[i] = r.notes[i].slice(cut); over -= cut; }
+  return r;
+}
+const atLimit = atSize(own.MAX_FILE_CHARS);
+const atLimitKept = own.withRecipe([], atLimit, { wanted: "y".repeat(own.MAX_ID) });
+const atLimitBase = own.withRecipe([], { ...atLimit, base: "z".repeat(own.MAX_ID) }, { wanted: "z".repeat(own.MAX_ID) });
+check("gate: at the limit in its longest form it passes, is kept at the longest address and with the longest base, and its recipe file loads back",
+  [longestForm(atLimit), gate(atLimit).problems, atLimitKept.problem, atLimitKept.id.length, atLimitBase.problem,
+    own.readRecipeFile(recipeFileText(own.recipeFileOf(atLimitKept.list[0])), NOW).problems, own.readRecipeFile(recipeFileText(own.recipeFileOf(atLimitBase.list[0])), NOW).problems],
+  [own.MAX_FILE_CHARS, [], undefined, own.OWN_MARK.length + own.MAX_ID, undefined, [], []]);
+check("gate: one character more is refused for its length, before anything is kept, whatever address it would get",
+  [gate(atSize(own.MAX_FILE_CHARS + 1)).problems, own.readRecipeFile(JSON.stringify(atSize(own.MAX_FILE_CHARS + 1), null, 2), NOW).problems], [[own.TOO_LONG], [own.TOO_LONG]]);
+
+// the stored list: what a page may use of it
+const list205 = Array.from({ length: 205 }, (_, n) => mine1({ id: "my--t" + n }));
+check("stored list: damaged entries, entries without one of his addresses and repeats are dropped; the rest keep their order",
+  own.cleanMine([mine1(), { junk: true }, mine1({ id: "toast" }), mine1({ title: "Second" }), mine1({ id: "my--b", title: "B" }), null]).map((x) => [x.id, x.title]),
+  [["my--toast", "Toast"], ["my--b", "B"]]);
+check("stored list: at most 200, and not a list is none", [own.cleanMine(list205).length, own.cleanMine(list205)[199].id, own.cleanMine({}), own.cleanMine("x")], [own.MAX_OWN, "my--t199", [], []]);
+check("stored list: a date that is not a date reads as long ago, not as now", own.cleanMine([mine1({ created: "soon" })])[0].created, "1970-01-01T00:00:00Z");
+
+// the same words: what a reader sees, not the address, version, dates or base
+const asMine = { ...clean(padThai), id: "my--pad-thai-baby", version: 9, created: NOW, updated: NOW, base: "pad-thai-baby" };
+check("same words: an address, a version, dates and a base do not count", own.sameWords(asMine, padThai), true);
+check("same words: a field left out reads as an empty one, and spaces at the ends do not count",
+  [own.sameWords(mine1({ notes: [] }), mine1()), own.sameWords(mine1({ title: " Toast " }), mine1())], [true, true]);
+check("same words: one changed step, tag, or amount is different",
+  [own.sameWords(asMine, { ...asMine, steps: [{ section: "", items: ["Other."] }] }), own.sameWords(asMine, { ...asMine, tags: [] }), own.sameWords(mine1(), mine1({ total_minutes: 6 }))], [false, false, false]);
+check("same words: something that is not a recipe is never the same", [own.wordsKey(null), own.sameWords(null, null), own.sameWords({}, {})], [null, false, false]);
+// The cookbook recipe with the same words is found by its words, not its address: a copy under another id or
+// title (a recipe whose id is not its title's slug, a file that gives an id of its own) is still the same recipe.
+const otherId = data.recipes.find((x) => slug(x.title) !== x.id) || padThai;
+check("same words in a list: found whatever address it is under; none when nothing matches",
+  [data.recipes.map((x) => own.sameWordsIn({ ...clean(x), id: "my--a-copy-of-it", base: "" }, data.recipes).id).every((id, n) => id === data.recipes[n].id),
+    own.sameWordsIn({ ...clean(otherId), id: "" }, data.recipes).id, own.sameWordsIn(mine1(), data.recipes), own.sameWordsIn(null, data.recipes), own.sameWordsIn(mine1(), [])],
+  [true, otherId.id, null, null, null]);
+check("twin: the cookbook recipe it stands beside, by its base, else by its plain address",
+  [own.twinOf({ id: "my--x", base: "pad-thai-baby" }, data.recipes).id, own.twinOf({ id: "my--pad-thai-baby" }, data.recipes).id, own.twinOf({ id: "my--no-such-thing-here" }, data.recipes)],
+  ["pad-thai-baby", "pad-thai-baby", null]);
+
+// the recipe file of one of his: what tools/build.py takes into recipes/ as it is
+const fileOf = own.recipeFileOf({ ...asMine, own: true, _words: ["x"], pdf: "pdf/x-v1.pdf" });
+check("recipe file: the id is its base, else the plain part of its address; base, own, _words and pdf stay out; the key order is the files'",
+  [fileOf.id, Object.keys(fileOf).join(","), own.recipeFileOf(mine1()).id, recipeFileName(own.recipeFileOf(mine1()))],
+  ["pad-thai-baby", Object.keys(clean(padThai)).join(","), "toast", "toast.json"]);
+check("recipe file: read back, it is the same recipe", own.sameWords(own.readRecipeFile(recipeFileText(fileOf), NOW).recipe, padThai), true);
+
+// reading a recipe file, loaded or pasted: never throws, and the id in it is never an address
+const readBack = own.readRecipeFile(recipeFileText(clean(padThai)), NOW);
+check("read file: a cookbook recipe file, which asks for the cookbook's id; base and address are never taken from a file",
+  [readBack.problems, readBack.wanted, readBack.recipe.id, readBack.recipe.base, readBack.recipe.title],
+  [[], "pad-thai-baby", "", undefined, padThai.title]);
+check("read file: a byte order mark at the start is fine", own.readRecipeFile("﻿" + recipeFileText(mine1()), NOW).wanted, "toast");
+check("read file: what it asks for: a plain id, the plain part of one of his addresses, else the title's slug",
+  [own.readRecipeFile(JSON.stringify(mine1({ id: "my--toast-2", base: "pad-thai-baby" })), NOW), own.readRecipeFile(JSON.stringify(mine1({ id: "../../evil", title: "Good Toast" })), NOW),
+    own.readRecipeFile(JSON.stringify(mine1({ id: 5, title: "Toast & Jam" })), NOW)].map((x) => [x.wanted, x.recipe.base]),
+  [["toast-2", undefined], ["good-toast", undefined], ["toast-and-jam", undefined]]);
+check("read file: refused, in plain words",
+  ["not json", "null", "[]", "[{}]", "{\"recipes\": []}", JSON.stringify(mine1({ schema: 2 })), "x".repeat(own.MAX_FILE_CHARS + 1), 5, JSON.stringify({ title: "Toast" })]
+    .map((t) => { const x = own.readRecipeFile(t, NOW); return [x.recipe, x.problems.join(" ")]; }),
+  [[null, own.NOT_A_FILE], [null, own.NOT_A_FILE], [null, own.MORE_THAN_ONE], [null, own.MORE_THAN_ONE], [null, own.MORE_THAN_ONE], [null, own.NEWER_FORMAT], [null, own.TOO_BIG], [null, own.TOO_BIG],
+    [null, [own.NO_TIME, own.NO_INGREDIENT, own.NO_STEP].join(" ")]]);
+check("read file: the sentences", [own.TOO_BIG, own.NOT_A_FILE, own.MORE_THAN_ONE, own.NEWER_FORMAT],
+  ["It is too big to be a recipe file. The most is 200,000 characters.", "It is not a recipe file from this site.", "It holds more than one recipe. Load one recipe file at a time.",
+    "It is in a newer recipe format than this page knows. Reload the page and try again."]);
+
+// putting one into the list: a new one at the top at the first free address; a changed one in its place
+const w1 = own.withRecipe([], mine1({ id: "" }), { wanted: "toast" });
+const w2 = own.withRecipe(w1.list, mine1({ id: "my--elsewhere", title: "Toast 2" }), { wanted: "toast" });
+const w3 = own.withRecipe(w2.list, mine1({ version: 2, title: "Toast, again" }), { replace: "my--toast" });
+check("with recipe: added at the top at the first free address, never over another; the id it brings is not used",
+  [w1.id, w2.id, w2.list.map((x) => x.id)], ["my--toast", "my--toast-2", ["my--toast-2", "my--toast"]]);
+check("with recipe: a changed one stays at its address and in its place", [w3.id, w3.list.map((x) => [x.id, x.title, x.version])], ["my--toast", [["my--toast-2", "Toast 2", 1], ["my--toast", "Toast, again", 2]]]);
+check("with recipe: the list given is not changed", w1.list.map((x) => x.id), ["my--toast"]);
+const full200 = own.cleanMine(list205);
+check("with recipe: no new one past 200, but one of the 200 can still change; something that is not a recipe is refused",
+  [own.withRecipe(full200, mine1(), { wanted: "new" }).problem, own.withRecipe(full200, mine1({ title: "Changed" }), { replace: "my--t3" }).list[3].title, own.withRecipe([], { title: "x" }, { wanted: "x" }).problem],
+  ["many", "Changed", "bad"]);
+
+// the join: the one place the cookbook and his recipes meet
+const book = { sections: data.sections, recipes: data.recipes };
+const joined = own.joinData(book, [mine1({ id: "my--zed", title: "Zed" }), mine1({ id: "my--apple", title: "apple" }), mine1({ id: "my--apple", title: "Again" })]);
+check("join: the cookbook first, the very same objects in the build's order, then his by title; each address once",
+  [joined.recipes.slice(0, data.recipes.length).every((x, n) => x === data.recipes[n]), joined.recipes.slice(data.recipes.length).map((x) => x.id), joined.book.length === data.recipes.length, joined.sections === data.sections],
+  [true, ["my--apple", "my--zed"], true, true]);
+check("join: his are marked as his and found by the word yours; the lists given are not changed",
+  [joined.recipes.filter((x) => x.own === true).length, narrow(joined.recipes, { query: "yours" }).filter((x) => x.own === true).map((x) => x.id),
+    joined.recipes.filter((x) => x.own === true).every((x) => x._words.includes("yours") && x._words.includes("bread")), data.recipes.some((x) => "own" in x), "own" in mine1()],
+  [2, ["my--apple", "my--zed"], true, false, false]);
+check("join: a cookbook recipe never takes one of his addresses, and nothing is there twice",
+  own.joinData({ sections: [], recipes: [{ ...padThai, id: "my--toast" }, padThai, padThai] }, [mine1()]).recipes.map((x) => [x.id, x.own === true]),
+  [["pad-thai-baby", false], ["my--toast", true]]);
+check("join: with none of his, the site is the cookbook", own.joinData(book, []).recipes.length === data.recipes.length && own.joinData(book, null).recipes.length === data.recipes.length, true);
+
+// what Add to your recipes keeps from a draft
+const toastDraft = { id: "d40", touched: 0, separate: false, fields: { ...emptyFields(), title: "Test Toast", minutes: "50", ingredients: "2 slices bread", steps: "Toast it." } };
+const fromNew = own.ownFromDraft(toastDraft, NOW, data.recipes, []);
+check("from draft: a new one asks for its title's slug, version 1, nothing to replace",
+  [fromNew.wanted, fromNew.replace, fromNew.editing, fromNew.recipe.version, fromNew.recipe.base], ["test-toast", "", false, 1, undefined]);
+const sameName = own.ownFromDraft({ ...toastDraft, fields: { ...toastDraft.fields, title: padThai.title } }, NOW, data.recipes, []);
+check("from draft: a new one with a cookbook recipe's title is kept beside it as his version", [sameName.wanted, sameName.recipe.base], [padThai.id, padThai.id]);
+const bookCopy = draftFromRecipe(padThai, "d41", 0);
+bookCopy.fields.headnote = "Mine now.";
+const fromCopy = own.ownFromDraft(bookCopy, NOW, data.recipes, []);
+check("from draft: a changed copy of a cookbook recipe is his version of it, one version past the cookbook's",
+  [fromCopy.wanted, fromCopy.recipe.base, fromCopy.recipe.version, fromCopy.replace, fromCopy.editing], [padThai.id, padThai.id, padThai.version + 1, "", false]);
+const myToast = mine1({ version: 2, base: "pad-thai-baby" });
+const ownEdit = draftFromRecipe(myToast, "d42", 0);
+ownEdit.fields.steps = "Toast it well.";
+const fromEdit = own.ownFromDraft(ownEdit, NOW, data.recipes, [myToast]);
+check("from draft: a changed draft of his own recipe replaces it, one version on, keeping its base and when it was made",
+  [fromEdit.editing, fromEdit.replace, fromEdit.wanted, fromEdit.recipe.version, fromEdit.recipe.base, fromEdit.recipe.created, fromEdit.stored === myToast],
+  [true, "my--toast", "toast", 3, "pad-thai-baby", NOW, true]);
+check("from draft: if it changed on the device since (another tab), the next version is past that one",
+  own.ownFromDraft(ownEdit, NOW, data.recipes, [{ ...myToast, version: 5 }]).recipe.version, 6);
+check("from draft: marked separate, it is a new recipe from its title", [own.ownFromDraft({ ...ownEdit, separate: true }, NOW, data.recipes, [myToast])].map((x) => [x.editing, x.replace, x.wanted, x.recipe.version])[0],
+  [false, "", "toast", 1]);
+
+// the store says what happened to a write that must never be half kept
+const kBox = new Map();
+const kStore = makeStore({ getItem: (k) => (kBox.has(k) ? kBox.get(k) : null), setItem: (k, v) => { kBox.set(k, String(v)); }, removeItem: (k) => { kBox.delete(k); } });
+check("store put: kept, and read back", [kStore.put("mine", 1, [1]), kStore.get("mine", 1, null), kStore.formatOf("mine")], ["kept", [1], 1]);
+const offStore = makeStore({ getItem: broken, setItem: broken, removeItem: broken });
+check("store put: storage off, held for the visit", [offStore.put("mine", 1, [2]), offStore.get("mine", 1, null), offStore.keeps()], ["visit", [2], false]);
+const tightBox = new Map([["grub.mine", JSON.stringify({ v: 1, data: ["old"] })]]);
+const tight = makeStore({ getItem: (k) => (tightBox.has(k) ? tightBox.get(k) : null),
+  setItem: (k, v) => { if (k === "grub.mine") throw new Error("full"); tightBox.set(k, String(v)); }, removeItem: (k) => { tightBox.delete(k); } });
+check("store put: no room for it, and nothing changes, not even for the visit", [tight.put("mine", 1, ["new"]), tight.get("mine", 1, null), tightBox.get("grub.mine")],
+  ["full", ["old"], JSON.stringify({ v: 1, data: ["old"] })]);
+// A device out of room, the way a browser is: every write that would go over the room left is refused with the
+// browser's own error, the small check write too. A draft saved on every key can use up the room to the last
+// character, so this is how a full device usually looks.
+function roomy(left, box) {
+  const used = () => [...box].reduce((n, [k, v]) => n + k.length + v.length, 0);
+  const device = { getItem: (k) => (box.has(k) ? box.get(k) : null), removeItem: (k) => { box.delete(k); },
+    setItem: (k, v) => {
+      const was = box.has(k) ? k.length + box.get(k).length : 0;
+      if (used() - was + k.length + String(v).length > device.limit) throw new DOMException("no room", "QuotaExceededError");
+      box.set(k, String(v));
+    } };
+  device.limit = used() + left;
+  return device;
+}
+const shared = new Map([["grub.mine", JSON.stringify({ v: 1, data: ["old"] })]]);
+const deviceA = roomy(0, shared), tabA = makeStore(deviceA);
+check("store put: out of room to the last character, it is full, not storage switched off: nothing changes, not even for the visit",
+  [tabA.put("mine", 1, ["from tab A", "old"]), tabA.get("mine", 1, null), shared.get("grub.mine")], ["full", ["old"], JSON.stringify({ v: 1, data: ["old"] })]);
+deviceA.limit = Infinity; // room again (a draft deleted), and another tab adds a recipe
+shared.set("grub.mine", JSON.stringify({ v: 1, data: ["from tab B", "old"] }));
+check("store put: and nothing held back from it is written later over what another tab kept meanwhile", [tabA.keeps(), tabA.get("mine", 1, null), shared.get("grub.mine")],
+  [true, ["from tab B", "old"], JSON.stringify({ v: 1, data: ["from tab B", "old"] })]);
+const oddQuota = (props) => makeStore({ getItem: () => null, removeItem: () => {}, setItem: () => { throw Object.assign(new Error("no room"), props); } });
+check("store put: every browser's way of saying it is out of room counts as full",
+  [{ name: "NS_ERROR_DOM_QUOTA_REACHED" }, { code: 22 }, { code: 1014 }].map((p) => oddQuota(p).put("mine", 1, [1])), ["full", "full", "full"]);
+check("store put: a refusal that is not about room, with no write going through at all, is storage switched off", makeStore({ getItem: broken, setItem: broken, removeItem: broken }).put("mine", 1, [1]), "visit");
+const readOnly = new Map([["grub.mine", JSON.stringify({ v: 1, data: ["kept before"] })]]);
+const ro = makeStore({ getItem: (k) => (readOnly.has(k) ? readOnly.get(k) : null), setItem: broken, removeItem: broken });
+check("store saved: what the device itself holds, apart from what is held for this visit",
+  [ro.put("mine", 1, ["this visit"]), ro.get("mine", 1, null), ro.saved("mine", 1, null), ro.saved("none", 1, "fallback"), offStore.saved("mine", 1, "fallback")],
+  ["visit", ["this visit"], ["kept before"], "fallback", "fallback"]);
+const fmtBox = new Map([["grub.a", JSON.stringify({ v: 2, data: [] })], ["grub.b", "not json"], ["grub.c", JSON.stringify(["x"])]]);
+const fmt = makeStore({ getItem: (k) => (fmtBox.has(k) ? fmtBox.get(k) : null), setItem: () => {}, removeItem: () => {} });
+check("store format: a later format is seen as later; nothing stored is null; something not ours is -1",
+  [fmt.formatOf("a"), fmt.formatOf("none"), fmt.formatOf("b"), fmt.formatOf("c"), fmt.get("a", 1, "fallback")], [2, null, -1, -1, "fallback"]);
+
+// the mark's word is written in one script only, so it reads the same wherever it shows
+const markFiles = [];
+for (const name of site.files.filter((x) => x.endsWith(".js"))) {
+  if ((await fetch("../" + name).then((x) => x.text())).includes("\"Yours\"")) markFiles.push(name);
+}
+check("the mark's word is written in one script only", markFiles, ["js/recipe-view.js"]);
 
 const passed = lines.filter((x) => x.startsWith("ok")).length;
 say("RESULT " + passed + " passed, " + failed + " failed");

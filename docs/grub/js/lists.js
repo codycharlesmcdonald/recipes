@@ -2,7 +2,7 @@
 import { h, starIcon } from "./dom.js";
 import { shortTime, chapterOf } from "./lib.js";
 import { isStarred, setStar } from "./state.js";
-import { daysMark } from "./recipe-view.js";
+import { daysMark, ownMark } from "./recipe-view.js";
 
 export function starButton(r, { withText = false, onChange = null } = {}) {
   const text = withText ? h("span", {}, "") : null;
@@ -22,12 +22,14 @@ export function starButton(r, { withText = false, onChange = null } = {}) {
   return b;
 }
 
-export function recipeRows(list, { showChapter = false, onStar = null } = {}) {
+// mark: false leaves out the Yours mark, for a list where every row is his own (Draft's Your recipes)
+export function recipeRows(list, { showChapter = false, onStar = null, mark = true } = {}) {
   return h("ul", { class: "rows" }, list.map((r) => h("li", {},
     h("a", { class: "row-link", href: "#/r/" + r.id },
       h("span", { class: "t" }, r.title),
       // the time, and beside it the tag of a recipe that needs more than one day, so it is seen before the recipe is chosen
       h("span", { class: "m" }, h("span", { class: "time" }, (showChapter ? chapterOf(r) + ", " : "") + shortTime(r)),
-        daysMark(r) ? [h("span", { class: "offscreen" }, ", "), daysMark(r)] : null)), // the comma is heard, not drawn
+        // the comma is heard, not drawn; one of his own recipes says so the same way
+        [daysMark(r), mark ? ownMark(r) : null].filter(Boolean).map((m) => [h("span", { class: "offscreen" }, ", "), m]))),
     starButton(r, { onChange: onStar }))));
 }

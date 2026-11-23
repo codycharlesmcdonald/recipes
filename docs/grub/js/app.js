@@ -1,7 +1,9 @@
 // Start-up and the addresses. Each page is drawn by its own module in pages/; the pure logic is in lib.js,
-// recipe-format.js, shopping-list.js and plan.js; what is kept on the device goes through store.js.
-import { h, watchSticky } from "./dom.js";
+// recipe-format.js, own.js, shopping-list.js and plan.js; what is kept on the device goes through store.js.
+import { h, watchSticky, takeWord } from "./dom.js";
 import { haystack, parseRoute } from "./lib.js";
+import { joinData } from "./own.js";
+import { myRecipes, myRecipesNewer } from "./state.js";
 import { home, SITE_TITLE } from "./pages/home.js";
 import { browse } from "./pages/browse.js";
 import { saved } from "./pages/saved.js";
@@ -29,12 +31,21 @@ function route() {
   const r = parseRoute(location.hash);
   const page = PAGES[r.name];
   try {
-    if (page) leave = page(app, data, r) || null;
+    // Every page gets the cookbook and his own recipes as one list, read fresh from the device each time, so a
+    // recipe added in another tab shows on the next page. joinData is the one place they meet: a shared store
+    // for everyone later would be read here and handed to joinData as a third list, and state.js's
+    // keepMyRecipe and deleteMyRecipe would write to it too. No page would change.
+    if (page) leave = page(app, joinData(data, myRecipes()), r) || null;
     else plain("Not here", "There is no page at this address.", "#/", "Go to the start");
   } catch (e) {
     // One page failing must not leave the last page on show under a new address, or the site stuck on "Loading".
     console.error(e);
     plain("That didn't work", "This page hit a problem and could not be shown.", "#/", "Go to the start");
+  }
+  takeWord(); // a line left for a page that did not take it is dropped
+  if (myRecipesNewer()) {
+    app.prepend(h("p", { class: "newer", role: "status" },
+      "Your recipes on this device were saved by a newer version of this site. Reload the page to see them."));
   }
   unstick = watchSticky(app);
 
