@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "id": "perfect-cup",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Perfect Cup",
+  "section": "Drank",
+  "total_minutes": 15,
+  "total_minutes_estimated": true,
+  "active_minutes": 15,
+  "tags": [
+    "coffee",
+    "pour over",
+    "chemex"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "42",
+          "unit": "g",
+          "name": "medium roast coffee",
+          "note": ""
+        },
+        {
+          "qty": "660",
+          "unit": "ml",
+          "name": "filtered water",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Warm 660+ ml water to 205°F and hold",
+        "Measure 42 g medium roast",
+        "Spritz with spray bottle to kill static",
+        "Grind to coarse consistency similar to rice width",
+        "On scale, tare and check 42 g, tare to 0",
+        "While waiting on water, light a tealight warmer",
+        "When hot, pour 84 g over grind, saturating most or all grounds, let bloom for 60 sec",
+        "When bloomed, pour remaining 560 ml (to 660 on scale) at the same pace water pours out to maintain temp",
+        "When poured, hold Chemex and take a cleanup lap around kitchen for even extraction"
+      ]
+    }
+  ]
+}

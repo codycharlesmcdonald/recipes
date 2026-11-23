@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "id": "shallot-crisps-and-oil",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Shallot Crisps & Oil",
+  "section": "Basics",
+  "total_minutes": 15,
+  "total_minutes_estimated": true,
+  "active_minutes": 15,
+  "tags": [
+    "shallot",
+    "oil",
+    "topping",
+    "crispy"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "shallot",
+          "note": ""
+        },
+        {
+          "qty": "1/2",
+          "unit": "cup",
+          "name": "olive oil (EVOO)",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Finely slice a shallot",
+        "In a saucepan, heat 1/2 cup olive oil (EVOO) to medium",
+        "Mix in shallot and stir until golden brown",
+        "Sieve immediately, save shallot oil and crispy shallots separately"
+      ]
+    }
+  ]
+}

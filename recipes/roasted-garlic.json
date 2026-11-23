@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "id": "roasted-garlic",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Roasted Garlic",
+  "section": "Basics",
+  "total_minutes": 40,
+  "total_minutes_estimated": true,
+  "active_minutes": 5,
+  "tags": [
+    "garlic",
+    "oven",
+    "spread"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "",
+          "unit": "",
+          "name": "garlic",
+          "note": "a whole bulb"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "salt and pepper",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "shallot oil",
+          "note": "from Shallot Crisps & Oil"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Preheat oven to 350",
+        "Remove stem from garlic, leaving root",
+        "Place root-down in sheet of foil, wrap",
+        "Top with salt and pepper, carefully drizzle in shallot oil",
+        "Bake 30 min at 350"
+      ]
+    }
+  ],
+  "notes": [
+    "Dish break."
+  ]
+}

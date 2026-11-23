@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "id": "mapo-tofu",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Mapo Tofu",
+  "section": "Grub",
+  "total_minutes": 25,
+  "total_minutes_estimated": true,
+  "active_minutes": 25,
+  "tags": [
+    "tofu",
+    "pork",
+    "sichuan",
+    "spicy",
+    "wok"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "450",
+          "unit": "g",
+          "name": "soft tofu",
+          "note": "1 block package, cubed"
+        },
+        {
+          "qty": "2",
+          "unit": "teaspoons",
+          "name": "veg oil",
+          "note": ""
+        },
+        {
+          "qty": "3",
+          "unit": "cloves",
+          "name": "garlic",
+          "note": "minced"
+        },
+        {
+          "qty": "2",
+          "unit": "",
+          "name": "green onion",
+          "note": "divided, white and green"
+        },
+        {
+          "qty": "2",
+          "unit": "",
+          "name": "Thai dry chilis",
+          "note": "crushed"
+        },
+        {
+          "qty": "80",
+          "unit": "g",
+          "name": "ground pork",
+          "note": ""
+        },
+        {
+          "qty": "1.5",
+          "unit": "tablespoons",
+          "name": "spicy bean paste",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "cup",
+          "name": "chicken stock",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "tablespoon",
+          "name": "oyster sauce",
+          "note": "or soy"
+        },
+        {
+          "qty": "1/2",
+          "unit": "teaspoon",
+          "name": "dark soy sauce",
+          "note": ""
+        },
+        {
+          "qty": "1/2",
+          "unit": "teaspoon",
+          "name": "sugar",
+          "note": ""
+        },
+        {
+          "qty": "1/2",
+          "unit": "teaspoon",
+          "name": "ground Sichuan pepper",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "tablespoon",
+          "name": "corn starch",
+          "note": "mixed with the water"
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "water",
+          "note": "mixed with the corn starch"
+        },
+        {
+          "qty": "1",
+          "unit": "teaspoon",
+          "name": "sesame oil",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Heat oil in wok over medium heat",
+        "Add in garlic, onion whites and dried chili and cook (30 sec) till fragrant",
+        "Add pork and cook (2 min)",
+        "Add bean paste and stir in (1 min)",
+        "Add chicken stock",
+        "Add oyster sauce, dark soy, sugar, ground Sichuan pepper, stir to cook (2 min)",
+        "Mix in corn starch slurry until thickened (2 min)",
+        "Carefully stir in tofu until heated through, finish with sesame oil and salt to taste",
+        "Plate and top with green onions"
+      ]
+    }
+  ]
+}

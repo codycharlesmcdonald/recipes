@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "mashed-potatoes",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Mashed Potatoes",
+  "section": "Grub",
+  "total_minutes": 50,
+  "total_minutes_estimated": true,
+  "active_minutes": 30,
+  "tags": [
+    "potatoes",
+    "side",
+    "holiday",
+    "brown butter",
+    "sage"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "3",
+          "unit": "lbs",
+          "name": "golden yellow spuds",
+          "note": ""
+        },
+        {
+          "qty": "3",
+          "unit": "sprigs",
+          "name": "thyme",
+          "note": ""
+        },
+        {
+          "qty": "8",
+          "unit": "leaves",
+          "name": "sage",
+          "note": ""
+        },
+        {
+          "qty": "4",
+          "unit": "",
+          "name": "garlic cloves",
+          "note": ""
+        },
+        {
+          "qty": "1.5",
+          "unit": "sticks",
+          "name": "salted butter",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "green onion",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "pint",
+          "name": "heavy cream",
+          "note": ""
+        },
+        {
+          "qty": "3",
+          "unit": "sprigs",
+          "name": "rosemary",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Crush garlic and quarter potatoes",
+        "Boil spuds and garlic in salt water (~30 min)",
+        "Mince sage",
+        "Warm cream",
+        "Add 4 tablespoons butter, 1 tablespoon chopped sage, and thyme",
+        "Raise heat to medium and whisk. Do not let boil.",
+        "Brown remaining butter with remaining sage and rosemary",
+        "Sieve butter into stand mixer",
+        "Mix in cream and potatoes",
+        "Slice onion root on bias",
+        "Serve potatoes warm topped with onion and sour cream"
+      ]
+    }
+  ],
+  "notes": [
+    "Focus up here. If you boil your cream, you have to take your stove apart mid service!",
+    "If you overcook your butter, you get grey potatoes with charcoal aftertaste!"
+  ]
+}

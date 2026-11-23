@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "id": "aioli",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Aioli",
+  "section": "Basics",
+  "total_minutes": 25,
+  "total_minutes_estimated": true,
+  "active_minutes": 25,
+  "tags": [
+    "sauce",
+    "garlic",
+    "mayo",
+    "pestle and mortar"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "A slice of",
+          "unit": "",
+          "name": "stale sourdough",
+          "note": ""
+        },
+        {
+          "qty": "Splash of",
+          "unit": "",
+          "name": "milk",
+          "note": ""
+        },
+        {
+          "qty": "5",
+          "unit": "cloves",
+          "name": "garlic",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "yolk",
+          "note": ""
+        },
+        {
+          "qty": "Pinch",
+          "unit": "",
+          "name": "salt",
+          "note": ""
+        },
+        {
+          "qty": "1+",
+          "unit": "cups",
+          "name": "nice EVOO",
+          "note": "in a dripper bottle"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "lemon juice",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Remove crust and soak bread in milk for 5 min",
+        "Smash garlic into pestle and mortar",
+        "Strain milk in cloth",
+        "Plop bread in mortar and smash until it’s a fine paste. Took me ~5 min",
+        "Drop in egg and salt then mash until thick and sticky",
+        "Add in EVOO drop by drop at first, then a splash at a time when constitution resembles a heavy mayo",
+        "Whisk in lemon juice to taste (patience!)"
+      ]
+    }
+  ],
+  "notes": [
+    "Gear: pestle and mortar, cheese cloth, whisk."
+  ]
+}

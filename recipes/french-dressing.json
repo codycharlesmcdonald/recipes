@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "id": "french-dressing",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "French Dressing",
+  "section": "Basics",
+  "total_minutes": 5,
+  "total_minutes_estimated": true,
+  "active_minutes": 5,
+  "tags": [
+    "dressing",
+    "salad",
+    "vinaigrette",
+    "shallot"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "red wine vinegar",
+          "note": ""
+        },
+        {
+          "qty": "Big pinch",
+          "unit": "",
+          "name": "salt",
+          "note": ""
+        },
+        {
+          "qty": "6",
+          "unit": "tablespoons",
+          "name": "shallot oil",
+          "note": "from Shallot Crisps & Oil"
+        },
+        {
+          "qty": "Big pinch",
+          "unit": "",
+          "name": "ground pepper",
+          "note": "about 20 twists"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "finely chopped chives",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Combine",
+        "Shake hard as f for 30+ seconds"
+      ]
+    }
+  ]
+}

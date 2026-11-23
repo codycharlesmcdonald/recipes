@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "id": "spicy-tuna-crispy-rice",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Spicy Tuna Crispy Rice",
+  "section": "Grub",
+  "total_minutes": 3000,
+  "total_minutes_estimated": true,
+  "active_minutes": 120,
+  "days": 3,
+  "tags": [
+    "tuna",
+    "ahi",
+    "rice",
+    "sushi",
+    "fried",
+    "appetizer"
+  ],
+  "ingredients": [
+    {
+      "section": "Day 1",
+      "items": [
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "green onion",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "English cucumber",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "cup",
+          "name": "rice vinegar",
+          "note": "divided"
+        },
+        {
+          "qty": "2",
+          "unit": "cups",
+          "name": "sushi rice",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "mirin",
+          "note": "plus splash"
+        },
+        {
+          "qty": "6",
+          "unit": "tablespoons",
+          "name": "sugar",
+          "note": ""
+        },
+        {
+          "qty": "1.5",
+          "unit": "tablespoons",
+          "name": "salt",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "soy sauce",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "fish sauce",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "section": "Day 3",
+      "items": [
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Sushi rice, prepared (from Day 1)",
+          "note": "",
+          "aside": true
+        },
+        {
+          "qty": "1/2",
+          "unit": "lb",
+          "name": "fresh ahi",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "jalapeño",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Green onion, wilted (from Day 1)",
+          "note": "",
+          "aside": true
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Pickled cucumber, prepared (from Day 1)",
+          "note": "",
+          "aside": true
+        },
+        {
+          "qty": "1",
+          "unit": "cup",
+          "name": "Kewpie mayo",
+          "note": ""
+        },
+        {
+          "qty": "3",
+          "unit": "tablespoons",
+          "name": "sriracha",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "toasted sesame oil",
+          "note": ""
+        },
+        {
+          "qty": "4",
+          "unit": "cups",
+          "name": "fry oil",
+          "note": ""
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "wasabi",
+          "note": ""
+        },
+        {
+          "qty": "4",
+          "unit": "tablespoons",
+          "name": "soy",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Day 1: green onion",
+      "items": [
+        "Remove onion stalks and save to wilt"
+      ]
+    },
+    {
+      "section": "Day 1: pickled cucumber",
+      "items": [
+        "Mince 1/2 cucumber into mise cup",
+        "Add second half of the rice vinegar, soy, fish sauce",
+        "Seal, label, refrigerate for 2 days"
+      ]
+    },
+    {
+      "section": "Day 1: rice",
+      "items": [
+        "Rinse 2 cups rice until clear, rest 20 min",
+        "In saucepan, mix mirin, half the rice vinegar, sugar, salt and simmer low until dissolved. Do not burn sugar.",
+        "Cook rice, then fold with sauce, rest to cool",
+        "Cover baking sheet with saran wrap and spoon rice over evenly",
+        "Cover with second wrap and flatten with equal size baking sheet",
+        "Wrap tight, label, let sit in fridge for 2 days"
+      ]
+    },
+    {
+      "section": "Day 3: prep",
+      "items": [
+        "Mince jalapeños and set aside",
+        "Open onion greens into flat sheets and fold into short, 1-inch stacks",
+        "Finely slice into onion “hairs” and set aside",
+        "Mix 2 tablespoons wasabi and 4 tablespoons soy in ramekins"
+      ]
+    },
+    {
+      "section": "Day 3: sriracha dressing",
+      "items": [
+        "Mix Kewpie, sriracha, sesame oil and transfer into mise bottle or piping bag"
+      ]
+    },
+    {
+      "section": "Day 3: crispy rice",
+      "items": [
+        "Divide rice into 1/2-inch by 2-inch small blocks",
+        "Heat 1/2 inch fry oil in deep carbon steel pan",
+        "Using long tweezers, place rice blocks in 30 sec intervals to avoid boiling pan",
+        "Turn and remove when golden brown all over"
+      ]
+    },
+    {
+      "section": "Day 3: tuna",
+      "items": [
+        "Mince the ahi and place in a medium mixing bowl with 1/4 cup sriracha dressing and mix",
+        "Plate the ever living piss out of this one."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "id": "maddys-bev-beericano-thing",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Maddy’s Bev (Beericano Thing)",
+  "section": "Drank",
+  "total_minutes": 5,
+  "total_minutes_estimated": true,
+  "active_minutes": 5,
+  "tags": [
+    "cocktail",
+    "beer",
+    "campari",
+    "vermouth"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "1",
+          "unit": "oz",
+          "name": "Campari",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "oz",
+          "name": "sweet vermouth",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "Peroni",
+          "note": "divided"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "salt",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Over ice, pour 1 oz Campari and 1 oz sweet vermouth and stir to chill",
+        "Top glass with Peroni or Italian beer, saving 1 inch at top",
+        "Pour a couple splashes of beer in a separate container, add a pinch of salt to bubble, and whisk or stir with a mixer until it foams",
+        "Top bev with foam and serve"
+      ]
+    }
+  ]
+}

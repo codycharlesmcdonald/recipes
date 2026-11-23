@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "id": "latkes",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Latkes",
+  "section": "Grub",
+  "total_minutes": 40,
+  "total_minutes_estimated": true,
+  "active_minutes": 40,
+  "tags": [
+    "potatoes",
+    "fried",
+    "hanukkah",
+    "shallot",
+    "chili crisp"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "2",
+          "unit": "cups",
+          "name": "potatoes",
+          "note": "shredded"
+        },
+        {
+          "qty": "3",
+          "unit": "",
+          "name": "eggs",
+          "note": "beaten"
+        },
+        {
+          "qty": "2",
+          "unit": "tablespoons",
+          "name": "AP flour",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "grated shallot",
+          "note": ""
+        },
+        {
+          "qty": "1 1/2",
+          "unit": "teaspoons",
+          "name": "salt",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "fry oil",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "sour cream",
+          "note": "for topping"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "scallions",
+          "note": "for topping"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "chili crisp",
+          "note": "for topping"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "shallot crisps",
+          "note": "prepared, from Shallot Crisps & Oil"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Shred and rinse potatoes, strain through a cheese cloth and pass into medium mixing bowl",
+        "Over bowl, grate 1 shallot",
+        "Beat 3 eggs and pass through a sieve into bowl",
+        "Spoon together until homogenized, lumps ok",
+        "Mix in salt and flour until flour disappears",
+        "Over medium heat, fry until golden brown and set on rack to drip",
+        "Top with chili crisp, sour cream, scallions and shallot crisps"
+      ]
+    }
+  ],
+  "notes": [
+    "You can use mash potatoes but your cakes will look like pancakes.",
+    "You can use apple sauce and scallions for a more traditional plate."
+  ]
+}

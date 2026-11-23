@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "id": "hollandaise",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Hollandaise",
+  "section": "Basics",
+  "headnote": "Richest mother sauce.",
+  "total_minutes": 20,
+  "total_minutes_estimated": true,
+  "active_minutes": 20,
+  "tags": [
+    "sauce",
+    "eggs",
+    "butter",
+    "brunch"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "1",
+          "unit": "teaspoon",
+          "name": "vinegar",
+          "note": "white wine"
+        },
+        {
+          "qty": "7",
+          "unit": "",
+          "name": "yolks",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "lemon juice",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "salt",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "cup",
+          "name": "clarified butter",
+          "note": "try unsalted, melted"
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Bain-marie on stove",
+        "Mix in yolks, vinegar, salt, lemon juice",
+        "Whisk over bain-marie, steaming, couple min",
+        "Gradually spoon in bain-marie water",
+        "Whisk until light in color and holds a figure 8 drizzle",
+        "Mix in as much clarified butter as possible without splitting. We want mayo consistency"
+      ]
+    }
+  ],
+  "notes": [
+    "Halve all.",
+    "Serve atop a poached egg over sourdough with crispy shallots in shallot oil. Spread roast garlic. Top with chili crisp and green onion."
+  ]
+}

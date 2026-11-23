@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "id": "stock",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Stock",
+  "section": "Basics",
+  "total_minutes": 1200,
+  "total_minutes_estimated": true,
+  "active_minutes": 45,
+  "days": 2,
+  "tags": [
+    "stock",
+    "chicken",
+    "scraps",
+    "soup"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "3 gallons of",
+          "unit": "",
+          "name": "scraps",
+          "note": "including a chicken carcass"
+        },
+        {
+          "qty": "2",
+          "unit": "",
+          "name": "leeks",
+          "note": "chopped"
+        },
+        {
+          "qty": "2",
+          "unit": "",
+          "name": "onions",
+          "note": "peeled"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "salt",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Roast",
+        "Separate meat",
+        "Fill 2 inches above",
+        "Skim",
+        "Add veggies",
+        "Simmer",
+        "Strain and refrigerate",
+        "Skim",
+        "Reduce"
+      ]
+    }
+  ]
+}

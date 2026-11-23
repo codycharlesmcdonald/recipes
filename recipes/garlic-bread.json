@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "id": "garlic-bread",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "Garlic Bread",
+  "section": "Grub",
+  "total_minutes": 55,
+  "total_minutes_estimated": true,
+  "active_minutes": 25,
+  "tags": [
+    "bread",
+    "garlic",
+    "shallot",
+    "butter",
+    "side"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "1",
+          "unit": "bulb",
+          "name": "garlic",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "shallot",
+          "note": ""
+        },
+        {
+          "qty": "1/2",
+          "unit": "cup",
+          "name": "salted Irish butter",
+          "note": "divided"
+        },
+        {
+          "qty": "1/4",
+          "unit": "cup",
+          "name": "EVOO",
+          "note": "plus a drizzle"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "salt and pepper",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "baguette",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "Roasted garlic",
+      "items": [
+        "Remove stem from garlic, exposing each clove, wrap in foil, top open",
+        "Drizzle EVOO, generously salt and pepper, twist foil tight",
+        "Bake at 350 for 30 min"
+      ]
+    },
+    {
+      "section": "Shallot crisps",
+      "items": [
+        "Finely slice shallot",
+        "In a saucepan, heat 1/2 cup EVOO to medium",
+        "Mix in shallot and stir until golden brown",
+        "Sieve immediately and save oil and shallots separately"
+      ]
+    },
+    {
+      "section": "Garlic spread",
+      "items": [
+        "Melt 1/4 cup salted butter",
+        "In blender cup, mix half the shallot oil, roasted garlic cloves, melted butter, 2 pinches salt",
+        "Pulse until coarse"
+      ]
+    },
+    {
+      "section": "Bread",
+      "items": [
+        "Cut baguette along length",
+        "Spread remaining butter",
+        "Spread or pour garlic spread",
+        "Broil until brown and top with shallot crisps"
+      ]
+    }
+  ],
+  "notes": [
+    "The list says 1/4 cup EVOO, written over 1/2. The shallot step still says 1/2 cup."
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "id": "french-onion-soup",
+  "version": 1,
+  "created": "2026-11-23T02:00:00Z",
+  "updated": "2026-11-23T02:00:00Z",
+  "title": "French Onion Soup",
+  "section": "Grub",
+  "total_minutes": 150,
+  "total_minutes_estimated": true,
+  "active_minutes": 60,
+  "tags": [
+    "soup",
+    "onion",
+    "french",
+    "cheese",
+    "bread"
+  ],
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        {
+          "qty": "3",
+          "unit": "lbs",
+          "name": "onions",
+          "note": "variety"
+        },
+        {
+          "qty": "1 heaping",
+          "unit": "tablespoon",
+          "name": "butter",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "tablespoon",
+          "name": "oil",
+          "note": ""
+        },
+        {
+          "qty": "Pinch",
+          "unit": "",
+          "name": "salt",
+          "note": ""
+        },
+        {
+          "qty": "Pinch",
+          "unit": "",
+          "name": "sugar",
+          "note": ""
+        },
+        {
+          "qty": "1",
+          "unit": "gallon",
+          "name": "stock",
+          "note": "chicken ok, use beef or bouillon if possible"
+        },
+        {
+          "qty": "1 heaping",
+          "unit": "tablespoon",
+          "name": "flour",
+          "note": ""
+        },
+        {
+          "qty": "1 light glass of",
+          "unit": "",
+          "name": "wine",
+          "note": ""
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "salt",
+          "note": "to taste"
+        },
+        {
+          "qty": "",
+          "unit": "",
+          "name": "pepper",
+          "note": "to taste"
+        },
+        {
+          "qty": "1",
+          "unit": "",
+          "name": "baguette",
+          "note": "sliced"
+        },
+        {
+          "qty": "1",
+          "unit": "cup",
+          "name": "grated parm",
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "section": "",
+      "items": [
+        "Cook your onions low, covered, until all onions are sweated, steamed, and playing",
+        "Uncover and turn heat to medium. Toss in salt and sugar",
+        "Cook 30-40 min until they’re all golden brown",
+        "While cooking, bring stock to a simmer",
+        "Sprinkle in flour to onions, then stir a few min",
+        "Kill heat to onions and pour in stock, wine, salt and pepper to taste",
+        "Simmer down to half, partially covered, skim topping foam to cup",
+        "Preheat oven to 350 and lay out bread slices",
+        "Bake until golden brown, 20-30 min",
+        "Place cooled croutes in cocottes and ladle reduced soup over. This will trap onion above the bread.",
+        "Cover generously with parm and broil ’til cheese is browned on top",
+        "Serve immediately and safely"
+      ]
+    }
+  ],
+  "notes": [
+    "Gear: 5 quart dutch oven (I like cast iron), 2 gallon pot, a cup for the foam, cocottes."
+  ]
+}
