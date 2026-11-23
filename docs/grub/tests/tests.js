@@ -1,9 +1,12 @@
 import { fold, slug, haystack, matches, minutesText, countText, chapterList, narrow, timeFacts, shortTime, ingredientText, amountText,
-  mergedLines, shoppingLine, shortcutUrl, isoStamp, buildIcs, buildPlanIcs, icsFileName, planFileName,
-  parseRoute, nameKey, browseState, browseHash, isIosDevice, storageCanLapse, pdfHref, MAX_MINUTES } from "../js/lib.js";
-import { parseIngredientLine, ingredientLine, parseIngredients, parseSteps, emptyFields, fieldsFromRecipe, totalMinutes, timeProblem, fieldsBlank,
-  draftFromRecipe, draftChanged, recipeFromDraft, draftProblems, recipeFileText, recipeFileName, cleanDraft } from "../js/recipe-format.js";
-import { addFromRecipe, addOwn, setGot, removeItem, clearTicked, counts, groups, sendLines, realIngredients, cleanList, OWN_TITLE } from "../js/shopping-list.js";
+  mergedLines, shoppingLine, isoStamp, buildIcs, buildPlanIcs, icsFileName, planFileName,
+  parseRoute, nameKey, browseState, browseHash, pdfHref, MAX_MINUTES,
+  daysOf, daysLabel, minDays, timePicked, timeChoice, BROWSE_TIMES, MAX_DAYS, totalText } from "../js/lib.js";
+import * as lib from "../js/lib.js";
+import { parseIngredientLine, ingredientLine, parseIngredients, parseSteps, parseTips, emptyFields, fieldsFromRecipe, totalMinutes, timeProblem, fieldsBlank,
+  draftFromRecipe, draftChanged, nothingToKeep, recipeFromDraft, draftProblems, recipeFileText, recipeFileName, cleanDraft,
+  daysFromField, daysField, daysWords, daysProblem } from "../js/recipe-format.js";
+import { addFromRecipe, addOwn, setGot, removeItem, clearTicked, counts, groups, copyLines, realIngredients, cleanList, OWN_TITLE } from "../js/shopping-list.js";
 import { emptyPlan, addToPlan, removeFromPlan, setPlanMinutes, usableMinutes, realTime, cleanPlan, planEntries, longestMinutes, planLines, startWhen,
   mealMsOf, dateValue, defaultDay, planDay } from "../js/plan.js";
 import { makeStore, PREFIX } from "../js/store.js";
@@ -11,10 +14,15 @@ import { localOnly } from "./local-only.js";
 
 const lines = [];
 let failed = 0;
+function say(line) {
+  // every line goes onto the page as it is made, so a run that stops part-way shows how far it got
+  lines.push(line);
+  document.getElementById("out").textContent = lines.join("\n");
+}
 function check(name, got, want) {
   const ok = JSON.stringify(got) === JSON.stringify(want);
   if (!ok) failed += 1;
-  lines.push((ok ? "ok   " : "FAIL ") + name + (ok ? "" : "\n     got  " + JSON.stringify(got) + "\n     want " + JSON.stringify(want)));
+  say((ok ? "ok   " : "FAIL ") + name + (ok ? "" : "\n     got  " + JSON.stringify(got) + "\n     want " + JSON.stringify(want)));
 }
 
 check("fold accents", fold("Piña Colada"), "pina colada");
@@ -41,8 +49,6 @@ check("ingredient text", ingredientText({ qty: "2", unit: "cloves", name: "garli
 check("ingredient no amount", ingredientText({ qty: "", unit: "", name: "ice", note: "" }), "ice");
 check("shopping line", shoppingLine({ qty: "2", unit: "cloves", name: "garlic", note: "smashed" }), "Garlic (2 cloves)");
 check("shopping line bare", shoppingLine({ qty: "", unit: "", name: "sriracha", note: "x" }), "Sriracha");
-check("shortcut url", shortcutUrl(["Garlic (2 cloves)", "Eggs (4)"]),
-  "shortcuts://run-shortcut?name=Recipe%20Shopping&input=text&text=Garlic%20(2%20cloves)%0AEggs%20(4)");
 
 // first vector: 50 minutes, eating 2026-11-27 02:30 UTC, made 2026-11-22 23:00 UTC, alert 10 minutes before
 const v1 = buildIcs({ id: "sample-skillet-lemon-chicken", title: "Skillet Lemon Chicken Thighs", totalMinutes: 50,
@@ -174,7 +180,8 @@ check("round trip: every recipe comes back the same, key for key",
   data.recipes.filter((x) => JSON.stringify(recipeFromDraft(draftFromRecipe(x, "d1", 0), NOW)) !== JSON.stringify(clean(x))).map((x) => x.id), []);
 check("round trip: still the same after the draft has been stored and read",
   data.recipes.filter((x) => JSON.stringify(recipeFromDraft(JSON.parse(JSON.stringify(draftFromRecipe(x, "d1", 0))), NOW)) !== JSON.stringify(clean(x))).map((x) => x.id), []);
-check("round trip covers all twelve", data.recipes.length, 12);
+// (this check used to say there are exactly twelve recipes; a thirteenth is not a fault)
+check("round trip covers every recipe in the data file", data.recipes.length > 0 && data.recipes.every((x) => typeof x.id === "string" && x.id), true);
 check("round trip: an untouched draft is not changed", data.recipes.some((x) => draftChanged(draftFromRecipe(x, "d1", 0))), false);
 check("the recipe file reads back as the recipe", data.recipes.every((x) => {
   const text = recipeFileText(recipeFromDraft(draftFromRecipe(x, "d1", 0), NOW));
@@ -185,7 +192,7 @@ const textOnly = data.recipes.filter((x) => {
   d.origin.known = [];
   return JSON.stringify(recipeFromDraft(d, NOW)) === JSON.stringify(clean(x));
 }).length;
-lines.push("info " + textOnly + " of " + data.recipes.length + " recipes come back the same through the text alone; the rest need the kept items for amounts in his own words");
+say("info " + textOnly + " of " + data.recipes.length + " recipes come back the same through the text alone; the rest need the kept items for amounts in his own words");
 
 const padThai = data.recipes.find((x) => x.id === "pad-thai-baby"), larp = data.recipes.find((x) => x.id === "larp-chicken-and-sticky-rice");
 const edited = draftFromRecipe(padThai, "d1", 0);
@@ -251,11 +258,12 @@ let list = addFromRecipe([], padThai, realIngredients(padThai).slice(0, 3));
 check("add from a recipe", [list.added, list.already, list.list.map((x) => x.name), list.list[1].recipeId, list.list[1].got], [3, 0, ["pad Thai rice sticks", "garlic", "fish sauce"], "pad-thai-baby", false]);
 list = setGot(list.list, list.list[1].key, true);
 check("tick one", counts(list), { toGet: 2, got: 1 });
-check("ticked things are not sent", sendLines(list), ["Pad Thai rice sticks (12 oz)", "Fish sauce (4 tablespoons)"]);
+check("ticked things are not copied", copyLines(list), ["Pad Thai rice sticks (12 oz)", "Fish sauce (4 tablespoons)"]);
 let again = addFromRecipe(list, padThai, realIngredients(padThai).slice(1, 2));
 check("adding it again puts it back on the to-get side, once", [again.added, again.already, again.list.length, counts(again.list).got], [0, 1, 3, 0]);
 again = addOwn(addFromRecipe(again.list, burgers, realIngredients(burgers).filter((x) => x.name === "garlic")).list, "  Paper   towels ");
-check("the same thing from two recipes is sent once with both amounts", sendLines(again.list), ["Pad Thai rice sticks (12 oz)", "Garlic (2 cloves + 2 cloves)", "Fish sauce (4 tablespoons)", "Paper towels"]);
+check("the same thing from two recipes is copied once with both amounts", copyLines(again.list), ["Pad Thai rice sticks (12 oz)", "Garlic (2 cloves + 2 cloves)", "Fish sauce (4 tablespoons)", "Paper towels"]);
+check("with everything ticked there is nothing to copy", copyLines(again.list.map((x) => ({ ...x, got: true }))), []);
 again = addFromRecipe(again.list, padThai, realIngredients(padThai).slice(3, 4));
 check("groups by recipe, his own last", groups(again.list).map((g) => [g.title, g.items.length]), [["Pad Thai, Baby", 4], ["Simple Bangin Burgers", 1], [OWN_TITLE, 1]]);
 check("an empty own item adds nothing", addOwn(again.list, "   ").added, 0);
@@ -297,11 +305,11 @@ check("narrow by nothing", narrow(three).length, 3);
 check("chapter list", chapterList(["Brekky", "Grub"], three), ["Brekky", "Grub", "Drank", "Other"]);
 check("count text", [countText(1, "recipe", "recipes"), countText(0, "recipe", "recipes")], ["1 recipe", "0 recipes"]);
 check("time facts: his own words", timeFacts(padThai), { ready: "Ready in an hour including prep", guess: "" });
-check("time facts: a guess is said to be a guess", timeFacts(larp),
-  { ready: "Ready in a day", guess: "The total time is a guess. Plans count it as 1 day, and you can change that in Prep." });
+check("time facts: a guess is said to be a guess", timeFacts({ total_minutes: 600, total_minutes_estimated: true, time_text: "most of a day" }),
+  { ready: "Ready in most of a day", guess: "The total time is a guess. Plans count it as 10 hours, and you can change that in Prep." });
 check("time facts: a guess with no words of his", timeFacts({ total_minutes: 18, total_minutes_estimated: true }).ready, "Ready in about 18 minutes");
 check("time facts: nothing yet", timeFacts({ total_minutes: 0 }).ready, "No total time yet");
-check("short time", [shortTime(padThai), shortTime(larp)], ["1 hour", "about 1 day"]);
+check("short time", [shortTime({ total_minutes: 60 }), shortTime({ total_minutes: 1440, total_minutes_estimated: true }), shortTime({ total_minutes: 1500 })], ["1 hour", "about 1 day", "1 day 1 hour"]);
 check("every guessed recipe says so", data.recipes.filter((x) => x.total_minutes_estimated && !timeFacts(x).guess).length, 0);
 
 // storage: the prefix, the format number, and a browser with storage switched off
@@ -372,23 +380,18 @@ check("route: anything else is missing", ["#/nowhere", "#/r/", "#/r/Bad_Id", "#/
 // Browse keeps what is picked in the address and nowhere else
 const chaptersNow = ["Brekky", "Grub", "Drank"];
 const stateOf = (text) => browseState(new URLSearchParams(text), chaptersNow);
-check("browse state: nothing in the address is nothing picked", stateOf(""), { query: "", chapter: "", maxMinutes: 0 });
-check("browse state: read from the address", stateOf("chapter=Grub&q=pea+nut&time=30"), { query: "pea nut", chapter: "Grub", maxMinutes: 30 });
-check("browse state: an unknown chapter or time is off", stateOf("chapter=Nope&time=31"), { query: "", chapter: "", maxMinutes: 0 });
+check("browse state: nothing in the address is nothing picked", stateOf(""), { query: "", chapter: "", maxMinutes: 0, minDays: 0 });
+check("browse state: read from the address", stateOf("chapter=Grub&q=pea+nut&time=30"), { query: "pea nut", chapter: "Grub", maxMinutes: 30, minDays: 0 });
+check("browse state: an unknown chapter or time is off", stateOf("chapter=Nope&time=31"), { query: "", chapter: "", maxMinutes: 0, minDays: 0 });
 check("browse address: nothing picked is the plain address", browseHash({ query: "  ", chapter: "", maxMinutes: 0 }), "#/browse");
 check("browse address: what is picked", browseHash({ query: "pea nut", chapter: "Grub", maxMinutes: 60 }), "#/browse?chapter=Grub&q=pea+nut&time=60");
 check("browse address and back, with awkward letters", (() => {
   const picked = { query: "jalapeño & lime?", chapter: "Drank", maxMinutes: 30 };
   return browseState(parseRoute(browseHash(picked)).query, chaptersNow);
-})(), { query: "jalapeño & lime?", chapter: "Drank", maxMinutes: 30 });
+})(), { query: "jalapeño & lime?", chapter: "Drank", maxMinutes: 30, minDays: 0 });
 
-// which device this is, for the two things only an iPhone does
-const iphone = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", platform: "iPhone", maxTouchPoints: 5 };
-const ipad = { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15", platform: "MacIntel", maxTouchPoints: 5 };
-const macSafari = { ...ipad, maxTouchPoints: 0 };
-const macChrome = { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", platform: "MacIntel", maxTouchPoints: 0 };
-check("Open in Calendar is for an iPhone or iPad only", [iphone, ipad, macSafari, macChrome, {}].map(isIosDevice), [true, true, false, false, false]);
-check("the week-away warning is for Safari and iPhones", [iphone, ipad, macSafari, macChrome, {}].map(storageCanLapse), [true, true, true, false, false]);
+// the site is the same on every device: nothing in it asks which device or browser this is
+check("no part of the logic tells one device or browser from another", ["isIosDevice", "storageCanLapse", "shortcutUrl", "SHORTCUT_NAME"].filter((name) => name in lib), []);
 
 // the tablet PDF link is only ever one of the site's own files
 check("pdf link: the site's own file", data.recipes.every((x) => pdfHref(x) === x.pdf && x.pdf), true);
@@ -478,6 +481,244 @@ check("own items: other alphabets too", addOwn(addOwn([], "香菜").list, "豆�
 check("merged lines keep them apart", mergedLines([{ name: "🧄", qty: "2", unit: "" }, { name: "🍋", qty: "", unit: "" }, { name: "???", qty: "1", unit: "" }, { name: "🧄", qty: "", unit: "" }]),
   ["🧄 (2 + some)", "🍋", "??? (1)"]);
 
-lines.push("RESULT " + lines.filter((x) => x.startsWith("ok")).length + " passed, " + failed + " failed");
-document.getElementById("out").textContent = lines.join("\n");
+/* ---------- fourth version: the same site on any device, and what the last check left over ---------- */
+
+// The shopping list stays in the site and leaves it by Copy list. No file the site serves may bring back the
+// way out that only worked on Apple devices. Through tools/run_tests.py the server lists every file in the
+// folder; anywhere else (this page is published with the site) the files are the ones the site itself links to.
+async function siteFiles() {
+  try {
+    const res = await fetch("../__files"); // a relative address, like every address in the site: on the live site it stays inside the site's own folder
+    if (res.ok) {
+      const all = await res.json(); // "all" keeps the test pages too, for the checks that read those as well
+      return { how: "every file in the folder", all, files: all.filter((name) => !name.startsWith("tests/")) };
+    }
+  } catch { /* not the local test server */ }
+  const seen = new Set(["index.html", "manifest.webmanifest", "data/recipes.json"]);
+  const page = await fetch("../index.html").then((x) => x.text());
+  for (const m of page.matchAll(/(?:href|src)="([^"#:]+)"/g)) seen.add(m[1]);
+  for (const name of seen) { // a script's own imports, followed until there are no new ones
+    if (!name.endsWith(".js")) continue;
+    const text = await fetch("../" + name).then((x) => x.text());
+    for (const m of text.matchAll(/from "(\.{1,2}\/[^"]+)"/g)) seen.add(new URL(m[1], "https://x/" + name).pathname.slice(1));
+  }
+  return { how: "the files the site links to", files: [...seen] };
+}
+const site = await siteFiles();
+const sweep = [];
+for (const name of site.files) {
+  const res = await fetch("../" + name);
+  const text = res.ok ? await res.text() : "";
+  if (!res.ok) sweep.push(name + " did not load");
+  for (const [word, found] of [["shortcuts:", /shortcuts:/i], ["Shortcut", /shortcut/i], ["Reminders", /\breminders\b/i]]) {
+    if (found.test(text) || found.test(name)) sweep.push(name + " has " + word);
+  }
+}
+say("info the sweep read " + site.files.length + " files: " + site.how);
+check("the sweep covers the page, the styles, the recipes and every script", ["index.html", "css/site.css", "data/recipes.json", "manifest.webmanifest", "js/app.js", "js/lib.js", "js/pages/shopping.js", "js/pages/prep.js"]
+  .filter((name) => !site.files.includes(name)), []);
+check("no file of the site holds a shortcuts: address or the words Shortcut or Reminders", sweep, []);
+
+// Prep: a day he set himself is not thrown away while the time box is empty or half typed
+const chosen = { ...emptyPlan(), items: [{ id: "pad-thai-baby", minutes: null }], date: "2026-11-25", dayChosen: true };
+check("plan day: his day is kept while there is no time", planDay({ ...chosen, time: "" }, four, 60), { date: "2026-11-25", dayChosen: true });
+check("plan day: and while the time is half typed", [planDay({ ...chosen, time: "1" }, four, 60), planDay({ ...chosen, time: "25:00" }, four, 60)],
+  [{ date: "2026-11-25", dayChosen: true }, { date: "2026-11-25", dayChosen: true }]);
+check("plan day: once the time is real his day is judged as before", [planDay({ ...chosen, time: "19:00" }, four, 60), planDay({ ...chosen, date: "2026-11-21", time: "19:00" }, four, 60)],
+  [{ date: "2026-11-25", dayChosen: true }, { date: "2026-11-22", dayChosen: false }]);
+check("plan day: a day that is no day is not kept, time or no time", planDay({ ...chosen, date: "2026-13-45", time: "" }, four, 60), { date: "2026-11-22", dayChosen: false });
+check("plan day: a day worked out for him is still worked out with no time", planDay({ ...chosen, dayChosen: false, time: "" }, four, 60), { date: "2026-11-22", dayChosen: false });
+
+// time boxes: text the browser will not hand over ("--", "1e" in a number box) reads as empty, and is said, not counted as blank
+check("time boxes: text the browser holds back is the same problem, in the same words", [timeProblem({ hours: "", minutes: "" }, true), timeProblem({ hours: "", minutes: "30" }, true), timeProblem({ hours: "1", minutes: "30" }, false)],
+  ["The time boxes take numbers only, like 1 hour 30 minutes.", "The time boxes take numbers only, like 1 hour 30 minutes.", ""]);
+check("a draft with held-back text in a time box is refused for that, not for a missing time",
+  [draftProblems({ id: "d11", fields: { ...fresh.fields, hours: "", minutes: "" } }, { timeUnread: true }), draftProblems({ id: "d11", fields: { ...fresh.fields, hours: "", minutes: "30" } }, { timeUnread: true }),
+    draftProblems({ id: "d11", fields: { ...fresh.fields, hours: "", minutes: "30" } })],
+  [["The time boxes take numbers only, like 1 hour 30 minutes."], ["The time boxes take numbers only, like 1 hour 30 minutes."], []]);
+
+// tips: a pasted list's numbers come off as they do for steps, and a tip that starts with an amount is left whole
+check("tips pasted with numbers lose them", parseTips("1. First tip\n2) Second\n 10.  Tenth \n- Dash\n• Dot"), ["First tip", "Second", "Tenth", "Dash", "Dot"]);
+check("a tip that starts with an amount keeps it", parseTips("2 cups is plenty\n2.5 cups is too much\n1/2 a lime will do\n350 degrees, no hotter\n3) is the charm"),
+  ["2 cups is plenty", "2.5 cups is too much", "1/2 a lime will do", "350 degrees, no hotter", "is the charm"]);
+check("a tip that is only a list number stays as typed, and empty lines go", parseTips("1.\n\n   \n2) "), ["1.", "2)"]);
+check("the recipe file gets the tips without their numbers", recipeFromDraft({ id: "d12", fields: { ...fresh.fields, tips: "1. Eat it hot.\n2. Don't burn it.\n2 cups is plenty" } }, NOW).notes,
+  ["Eat it hot.", "Don't burn it.", "2 cups is plenty"]);
+
+// a copy of a recipe holds nothing of his own until it differs from the recipe, and again once it is changed back
+const back = draftFromRecipe(padThai, "d13", 0);
+const first = nothingToKeep(back);
+back.fields.title = "Pad Thai, Baby II";
+const second = nothingToKeep(back);
+back.fields.title = padThai.title;
+const third = nothingToKeep(back);
+back.separate = true;
+check("nothing to keep: an untouched copy, not a changed one, again once it is changed back, not one marked separate", [first, second, third, nothingToKeep(back)], [true, false, true, false]);
+check("nothing to keep: a new draft with every box empty, and not one with a letter in it",
+  [nothingToKeep({ id: null, fields: emptyFields() }), nothingToKeep({ id: null, fields: { ...emptyFields(), tips: " " } }), nothingToKeep({ id: null, fields: { ...emptyFields(), tips: "x" } })], [true, true, false]);
+
+/* ---------- fifth version: the tag on a recipe that needs more than one day ---------- */
+
+// the words of the tag are made in one place, and only from the recipe's days
+check("days label: 2, 3 and 14", [2, 3, 14].map((n) => daysLabel({ days: n })), ["2-day recipe", "3-day recipe", "14-day recipe"]);
+check("days label: nothing for a same-day recipe, or for days that is not a whole number from 2 to 14",
+  [{}, { days: 1 }, { days: 0 }, { days: 15 }, { days: 2.5 }, { days: "2" }, { days: true }, { days: null }, null].map(daysLabel), Array(9).fill(""));
+check("days of: the number, or 1 for the same day", [daysOf({ days: 2 }), daysOf({ days: 14 }), daysOf({}), daysOf({ days: 15 }), daysOf({ days: "3" })], [2, 14, 1, 1, 1]);
+// (the checks on the real recipes say what is true of the larp, never that no other recipe is tagged: the day
+// a second recipe gets its days, or a thirteenth recipe is added, nothing here is wrong)
+check("the larp is a 2-day recipe", [larp.days, daysLabel(larp)], [2, "2-day recipe"]);
+check("every recipe that carries days carries a number the tag can show", data.recipes.filter((x) => "days" in x && !daysLabel(x)).map((x) => x.id), []);
+const wordFiles = [];
+for (const name of site.files.filter((x) => x.endsWith(".js"))) {
+  if ((await fetch("../" + name).then((x) => x.text())).includes("\"-day recipe\"")) wordFiles.push(name);
+}
+check("the tag's words are written in one script only, so they cannot drift", wordFiles, ["js/lib.js"]);
+
+// the fewest days a total time allows
+check("fewest days: under 24 hours it can be the same day (an overnight soak is the writer's call)", [1, 600, 840, 1439].map(minDays), [1, 1, 1, 1]);
+check("fewest days: 24 hours is 2 days, 48 hours is 3", [1440, 1500, 2879, 2880, 4320].map(minDays), [2, 2, 2, 3, 4]);
+check("fewest days: it stops at 14, so a total of two weeks can still be written down", [minDays(18719), minDays(18720), minDays(MAX_MINUTES), MAX_DAYS], [13, 14, 14, 14]);
+check("every recipe on the site has at least the days its total time needs", data.recipes.filter((x) => daysOf(x) < minDays(x.total_minutes)).map((x) => x.id), []);
+
+// search: the tag's words find a tagged recipe, from its days and nothing else
+const beans = (days) => ({ title: "Slow Beans", section: "Grub", tags: [], total_minutes: 840, days,
+  ingredients: [{ section: "", items: [{ qty: "1", unit: "lb", name: "beans", note: "" }] }] });
+const finds = (recipe, typed) => matches(haystack(recipe), typed);
+check("search: a 2-day recipe is found by the tag's words", ["2 day", "2-day", "two day", "2 days", "two-day", "TWO DAYS", "2-day recipe", "two day beans"].map((q) => finds(beans(2), q)), Array(8).fill(true));
+check("search: and not by another number", ["3 day", "three day", "12 day", "twelve"].map((q) => finds(beans(2), q)), Array(4).fill(false));
+check("search: the same for 3 and up, with the number", [finds(beans(3), "3 day"), finds(beans(3), "three-day"), finds(beans(3), "2 day"), finds(beans(3), "two day"),
+  finds(beans(12), "12-day recipe"), finds(beans(12), "twelve day"), finds(beans(14), "fourteen days")], [true, true, false, false, true, true, true]);
+check("search: a same-day recipe is not found by them", ["2 day", "two day", "day", "two"].map((q) => finds(beans(undefined), q)), Array(4).fill(false));
+check("search: the word recipe leaves the list as it was, tagged or not", [finds(beans(2), "recipe"), finds(beans(undefined), "recipes"), narrow(data.recipes, { query: "recipe" }).length], [true, true, data.recipes.length]);
+check("search on the real recipes: 2 day, 2-day, two day and the tag typed whole each find the larp",
+  ["2 day", "2-day", "two day", "2-day recipe"].map((q) => narrow(data.recipes, { query: q }).some((x) => x.id === larp.id)), Array(4).fill(true));
+check("search: a word that is only in a step finds nothing, because steps are not searched",
+  finds({ ...beans(2), steps: [{ section: "", items: ["Soak the beans overnight."] }] }, "overnight"), false);
+
+// The word "recipe" is never put among a recipe's own words, so its first letters do not match every recipe.
+const rice = { title: "Red Rice", section: "Grub", tags: [], ingredients: [{ section: "", items: [{ qty: "1", unit: "cup", name: "rice", note: "" }] }] };
+const toast = { title: "Toast", section: "Brekky", tags: [], ingredients: [{ section: "", items: [{ qty: "2", unit: "slices", name: "bread", note: "" }] }] };
+const soaked = { ...beans(2), title: "Soaked Beans" };
+const pantry = [rice, toast, soaked];
+const found = (typed) => narrow(pantry, { query: typed }).map((x) => x.title);
+check("search: a recipe's words are its own, with no word added that every recipe would share",
+  [haystack(rice), haystack(toast).includes("recipes"), haystack(soaked).includes("recipes")], [["red", "rice", "grub", "rice"], false, false]);
+check("search: r and re narrow the list like any other letters", [found("r"), found("re"), found("b")], [["Red Rice"], ["Red Rice"], ["Toast", "Soaked Beans"]]);
+check("search: the word recipe, and its first three letters or more, leave the list whole", ["rec", "reci", "recip", "recipe", "recipes", "RECIPE"].map((q) => found(q).length), Array(6).fill(3));
+check("search: so the tag typed whole finds the tagged recipe at every letter on the way", ["2-day r", "2-day re", "2-day rec", "2-day recip", "2-day recipe", "2-day recipes"].map(found),
+  [[], [], ["Soaked Beans"], ["Soaked Beans"], ["Soaked Beans"], ["Soaked Beans"]]);
+check("search: the word beside another still narrows by the other", [found("rice recipe"), found("toast recipes"), found("recipe zzz")], [["Red Rice"], ["Toast"], []]);
+check("search: a longer word that only starts the same way is searched for as it is", [found("recipez"), found("recipess"), matches(["recipezine"], "recipez")], [[], [], true]);
+
+// Browse: one more Time choice, and the short-time choices never show a recipe that needs more than one day
+const mixed = [{ id: "quick", title: "Quick", total_minutes: 20, ingredients: [] }, { id: "soak", title: "Soak", total_minutes: 20, days: 2, ingredients: [] },
+  { id: "hour", title: "Hour", total_minutes: 60, ingredients: [] }, { id: "long", title: "Long", total_minutes: 4000, days: 3, ingredients: [] },
+  { id: "slow", title: "Slow", total_minutes: 900, ingredients: [] }];
+check("browse times: the new choice comes after the ones that were there", BROWSE_TIMES, [[0, "Any"], [30, "30 minutes or less"], [60, "An hour or less"], ["days", "Two days or more"]]);
+check("narrow: Two days or more is the recipes whose days say so", narrow(mixed, { minDays: 2 }).map((x) => x.id), ["soak", "long"]);
+check("narrow: 30 minutes or less and An hour or less never show a recipe with days, however short its total",
+  [narrow(mixed, { maxMinutes: 30 }).map((x) => x.id), narrow(mixed, { maxMinutes: 60 }).map((x) => x.id)], [["quick"], ["quick", "hour"]]);
+check("narrow: days with a chapter and with words", [narrow(mixed, { minDays: 2, query: "lon" }).map((x) => x.id), narrow(mixed, { minDays: 2, chapter: "Grub" }).map((x) => x.id)], [["long"], []]);
+check("narrow on the real recipes: Two days or more lists the larp and only recipes that carry the tag, and An hour or less lists none that do",
+  [narrow(data.recipes, { minDays: 2 }).some((x) => x.id === larp.id), narrow(data.recipes, { minDays: 2 }).every((x) => daysLabel(x)), narrow(data.recipes, { maxMinutes: 60 }).some((x) => daysLabel(x))], [true, true, false]);
+check("browse state: the days choice is read from the address", stateOf("time=days"), { query: "", chapter: "", maxMinutes: 0, minDays: 2 });
+check("browse state: anything else under time is off", [stateOf("time=Days"), stateOf("time=2"), stateOf("time=0")], Array(3).fill({ query: "", chapter: "", maxMinutes: 0, minDays: 0 }));
+check("browse address: the days choice", [browseHash({ minDays: 2 }), browseHash({ chapter: "Grub", query: "rice", minDays: 2 })], ["#/browse?time=days", "#/browse?chapter=Grub&q=rice&time=days"]);
+check("browse address and back, with the days choice", browseState(parseRoute(browseHash({ query: "rice", chapter: "Grub", maxMinutes: 0, minDays: 2 })).query, chaptersNow),
+  { query: "rice", chapter: "Grub", maxMinutes: 0, minDays: 2 });
+check("time choice: one at a time", [timePicked(0), timePicked(30), timePicked("days"), timeChoice(timePicked(60)), timeChoice(timePicked("days")), timeChoice(timePicked(0)), timeChoice()],
+  [{ maxMinutes: 0, minDays: 0 }, { maxMinutes: 30, minDays: 0 }, { maxMinutes: 0, minDays: 2 }, 60, "days", 0, 0]);
+
+// the form: the days box into the recipe file and back
+check("days box: read as a number, 1 for the same day", ["", "2", " 3 ", "14", "15", "1", "0", "2.5", "abc", null, undefined, 7].map(daysFromField), [1, 2, 3, 14, 1, 1, 1, 1, 1, 1, 1, 7]);
+check("days box: written from a number", [1, 2, 14, 15, undefined, "3", 2.5].map(daysField), ["", "2", "14", "", "", "", ""]);
+check("days box: how the control names them", [daysWords(1), daysWords(2), daysWords(14)], ["Same day", "2 days", "14 days"]);
+check("fields from a recipe: the days", [fieldsFromRecipe(larp).days, fieldsFromRecipe(padThai).days, emptyFields().days], ["2", "", ""]);
+const larpBack = recipeFromDraft(draftFromRecipe(larp, "d1", 0), NOW);
+check("round trip with days: the larp comes back with its days, in the place the file has it", [larpBack.days, Object.keys(larpBack).join(" "), JSON.stringify(larpBack) === JSON.stringify(clean(larp))],
+  [2, "schema id version created updated title section headnote yield time_text total_minutes total_minutes_estimated active_minutes days tags ingredients steps", true]);
+check("round trip with days: the built data carries the field for the larp, and no recipe carries it for the same day", [larp.days, data.recipes.filter((x) => "days" in x && daysOf(x) === 1).map((x) => x.id)], [2, []]);
+const soak = { id: "d20", touched: 0, separate: false, fields: { ...fresh.fields, hours: "14", minutes: "", days: "2" } };
+check("a new draft set to 2 days: the file says so, after the total time", [recipeFromDraft(soak, NOW).days, recipeFromDraft(soak, NOW).total_minutes, Object.keys(recipeFromDraft(soak, NOW)).join(" "), draftProblems(soak)],
+  [2, 840, "schema id version created updated title section source headnote yield time_text total_minutes days tags ingredients steps notes", []]);
+check("a same-day draft leaves days out of the file", ["days" in recipeFromDraft(fresh, NOW), "days" in recipeFromDraft({ ...soak, fields: { ...soak.fields, days: "1" } }, NOW),
+  "days" in recipeFromDraft({ ...soak, fields: { ...soak.fields, days: "15" } }, NOW)], [false, false, false]);
+check("the recipe file of a 2-day draft reads back with its days", JSON.parse(recipeFileText(recipeFromDraft(soak, NOW))).days, 2);
+const D = (hours, days) => ({ id: "d21", fields: { ...fresh.fields, hours, minutes: "", days } });
+check("too few days for the time is refused in plain words", [draftProblems(D("24", "")), draftProblems(D("50", "2")), draftProblems(D("336", "13"))], [
+  ["The total time is 24 hours or more, so this recipe needs at least 2 days. Under Days it needs, pick 2 days or more."],
+  ["The total time is 48 hours or more, so this recipe needs at least 3 days. Under Days it needs, pick 3 days or more."],
+  ["The total time is 312 hours or more, so this recipe needs at least 14 days. Under Days it needs, pick 14 days."]]);
+check("enough days is not, and under 24 hours any number of days is the writer's call",
+  [draftProblems(D("24", "2")), draftProblems(D("24", "5")), draftProblems(D("50", "3")), draftProblems(D("336", "14")), draftProblems(D("14", "2")), draftProblems(D("14", ""))], Array(6).fill([]));
+check("the days line on its own", [daysProblem({ hours: "23", minutes: "59", days: "" }), daysProblem({ hours: "24", minutes: "", days: "" }).startsWith("The total time is 24 hours or more"),
+  daysProblem({ hours: "abc", minutes: "", days: "" })], ["", true, ""]);
+check("a total time that is itself wrong is said, without a days line on top", draftProblems(D("400", "")), ["The total time can be two weeks at most."]);
+const daysCopy = draftFromRecipe(larp, "d22", 0);
+daysCopy.fields.days = "3";
+check("a copy with only its days changed is a changed copy, the next version", [draftChanged(daysCopy), nothingToKeep(daysCopy), recipeFromDraft(daysCopy, NOW).days, recipeFromDraft(daysCopy, NOW).version], [true, false, 3, larp.version + 1]);
+daysCopy.fields.days = "";
+check("and a day-long copy set back to Same day is refused", draftProblems(daysCopy), ["The total time is 24 hours or more, so this recipe needs at least 2 days. Under Days it needs, pick 2 days or more."]);
+const oldDraft = cleanDraft({ id: "d23", touched: 1, fields: { title: "Old", hours: "1" } });
+check("a draft kept before days existed reads as a same-day draft", [oldDraft.fields.days, "days" in recipeFromDraft(oldDraft, NOW)], ["", false]);
+check("a days box holding something else from the device is the same day", "days" in recipeFromDraft(cleanDraft({ id: "d24", fields: { title: "Odd", days: "lots" } }), NOW), false);
+
+/* ---------- sixth version: what the three reviews of the fifth found ---------- */
+
+// pasted lists: a list number is one or two digits; a year or an oven heat that starts a sentence stays
+check("tips: a line that starts with a year or an oven heat and a full stop keeps the number",
+  parseTips("1985. The year nana wrote this down.\n350. No hotter than that.\n100) is a lot of dumplings\n2019 was a good year for this\n350 degrees. No hotter."),
+  ["1985. The year nana wrote this down.", "350. No hotter than that.", "100) is a lot of dumplings", "2019 was a good year for this", "350 degrees. No hotter."]);
+check("steps: the same", parseSteps("350. No hotter.\n1985. Nana's year.\n1.5 hours in the fridge\n3-4 days in the fridge")[0].items,
+  ["350. No hotter.", "1985. Nana's year.", "1.5 hours in the fridge", "3-4 days in the fridge"]);
+check("list numbers up to 99 still come off, for tips and for steps",
+  [parseTips("1. One\n9) Nine\n10. Ten\n99. Ninety-nine"), parseSteps("1. One\n12) Twelve\n99. Ninety-nine")[0].items],
+  [["One", "Nine", "Ten", "Ninety-nine"], ["One", "Twelve", "Ninety-nine"]]);
+
+// a total time beside the tag is counted in hours: "1 day" next to "2-day recipe" reads as one day against two
+check("total text: a same-day recipe's time reads as before", [totalText(20), totalText(60), totalText(205), totalText(1440), totalText(1500, 1)], ["20 minutes", "1 hour", "3 hours 25 minutes", "1 day", "1 day 1 hour"]);
+check("total text: with 2 days or more it is counted in hours", [totalText(1440, 2), totalText(1500, 2), totalText(840, 2), totalText(2970, 3), totalText(20, 2), totalText(60, 2), totalText(61, 2), totalText(MAX_MINUTES, 14)],
+  ["24 hours", "25 hours", "14 hours", "49 hours 30 minutes", "20 minutes", "1 hour", "1 hour 1 minute", "336 hours"]);
+const dayLong = { total_minutes: 1440, total_minutes_estimated: true, days: 2 };
+check("short time: a tagged recipe never says a number of days beside its tag", [shortTime(dayLong), shortTime({ total_minutes: 4000, days: 3 }), shortTime({ ...dayLong, days: undefined })], ["about 24 hours", "66 hours 40 minutes", "about 1 day"]);
+check("time facts: the same on the recipe page", [timeFacts(dayLong), timeFacts({ ...dayLong, time_text: "a day" }).guess, timeFacts({ total_minutes: 1440, days: 2 }).ready],
+  [{ ready: "Ready in about 24 hours", guess: "The total time is a guess. Plans count it as 24 hours, and you can change that in Prep." },
+    "The total time is a guess. Plans count it as 24 hours, and you can change that in Prep.", "Ready in 24 hours"]);
+check("the larp's own count is in hours, in the list and on its page", [shortTime(larp).endsWith(totalText(larp.total_minutes, larp.days)), /\d days?\b/.test(shortTime(larp)), /\d days?\b/.test(timeFacts(larp).guess)],
+  [true, false, false]);
+
+// a changed copy is numbered from the later of its own version and the site's, so it is never handed over as a
+// version the site already has
+const stale = draftFromRecipe({ ...padThai, version: 3 }, "d30", 0);
+check("an unchanged copy keeps the version it was copied at, whatever the site has", [recipeFromDraft(stale, NOW).version, recipeFromDraft(stale, NOW, 5).version, recipeFromDraft(stale, NOW, 3).version], [3, 3, 3]);
+stale.fields.headnote = "Changed.";
+check("a changed copy is the version after its own when the site has not moved on", [recipeFromDraft(stale, NOW).version, recipeFromDraft(stale, NOW, 3).version, recipeFromDraft(stale, NOW, 0).version, recipeFromDraft(stale, NOW, 1).version], [4, 4, 4, 4]);
+check("a changed copy of a version the site has left behind is the version after the site's", [recipeFromDraft(stale, NOW, 4).version, recipeFromDraft(stale, NOW, 9).version], [5, 10]);
+check("a site version that is not a whole number is not counted", [recipeFromDraft(stale, NOW, "9").version, recipeFromDraft(stale, NOW, NaN).version, recipeFromDraft(stale, NOW, null).version], [4, 4, 4]);
+stale.separate = true;
+check("a separate recipe starts at version 1 whatever the site has", recipeFromDraft(stale, NOW, 9).version, 1);
+
+// every address the site's own files ask for is relative, the test pages included (the site lives in a folder
+// of its own, so an address that starts at the server's root would leave it)
+const rooted = [];
+const everyFile = site.all ? site.all : site.files.concat(["tests/index.html", "tests/tests.js", "tests/flows.html", "tests/flows.js", "tests/flows-run.js", "tests/local-only.js"]);
+for (const name of everyFile.filter((x) => /\.(js|html|css|webmanifest)$/.test(x) && !x.startsWith("tests/zz-"))) {
+  const text = await fetch("../" + name).then((x) => (x.ok ? x.text() : ""));
+  for (const [what, shape] of [["a fetch from the root", /fetch\(\s*["'`]\//], ["an import from the root", /(?:from|import)\s*\(?\s*["'`]\//], ["a link or file from the root", /\b(?:href|src|action)\s*=\s*["']\//], ["a style file from the root", /url\(\s*["']?\//]]) {
+    if (shape.test(text)) rooted.push(name + " has " + what);
+  }
+}
+check("no file of the site or its tests asks for an address that starts at the server's root", [rooted, everyFile.includes("tests/tests.js") && everyFile.includes("js/app.js")], [[], true]);
+
+// one PDF per recipe: the folder holds the file each recipe links to and no older version of any
+if (site.how === "every file in the folder") {
+  const pdfs = site.files.filter((x) => x.startsWith("pdf/") && x.endsWith(".pdf")).sort();
+  check("the pdf folder holds nothing left over from an earlier version (first list), and every recipe has its own PDF there (second list names any that needs tools/make_pdf.py run on it)",
+    [pdfs.filter((x) => !data.recipes.some((r) => r.pdf === x)), data.recipes.filter((r) => !pdfs.includes(r.pdf)).map((r) => r.id)], [[], []]);
+} else {
+  say("info the pdf folder was not listed (this page was not opened through tools/run_tests.py), so left-over PDFs were not looked for");
+}
+
+const passed = lines.filter((x) => x.startsWith("ok")).length;
+say("RESULT " + passed + " passed, " + failed + " failed");
 document.title = failed ? "FAILED" : "PASSED";

@@ -58,6 +58,9 @@ def main():
     framed = width < MIN_WINDOW
     handler = functools.partial(Handler, directory=root)
     socketserver.TCPServer.allow_reuse_address = True
+    # Chrome asks for a page's twenty or so files at once. The usual queue of 5 waiting connections overflows on
+    # a busy computer and the page is pictured without some of its scripts (the same fault tools/run_tests.py had).
+    socketserver.TCPServer.request_queue_size = 128
     with socketserver.ThreadingTCPServer(("127.0.0.1", 0), handler) as srv:
         port = srv.server_address[1]
         threading.Thread(target=srv.serve_forever, daemon=True).start()

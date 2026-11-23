@@ -1,8 +1,9 @@
 // Browse: every recipe by chapter, with the search box and two ways to narrow (chapter, time).
-// What is picked lives in the address (#/browse?chapter=Grub&q=peanut&time=30) and nowhere else, so Back and a
-// reload come back to the same list, and the plain Browse link always shows every recipe.
+// What is picked lives in the address (#/browse?chapter=Grub&q=peanut&time=30, or time=days for the recipes
+// that need more than one day) and nowhere else, so Back and a reload come back to the same list, and the
+// plain Browse link always shows every recipe.
 import { h, put } from "../dom.js";
-import { narrow, chapterList, chapterOf, countText, browseState, browseHash, BROWSE_TIMES } from "../lib.js";
+import { narrow, chapterList, chapterOf, countText, browseState, browseHash, timePicked, timeChoice, BROWSE_TIMES } from "../lib.js";
 import { recipeRows } from "../lists.js";
 import { SITE_TITLE } from "./home.js";
 
@@ -24,7 +25,8 @@ export function browse(app, data, route) {
   };
   const chapterChips = [chip("All", () => !picked.chapter, () => { picked.chapter = ""; })]
     .concat(chapters.map((c) => chip(c, () => picked.chapter === c, () => { picked.chapter = picked.chapter === c ? "" : c; })));
-  const timeChips = BROWSE_TIMES.map(([n, label]) => chip(label, () => picked.maxMinutes === n, () => { picked.maxMinutes = picked.maxMinutes === n ? 0 : n; }));
+  // one Time choice at a time; pressing the one that is on takes it off again
+  const timeChips = BROWSE_TIMES.map(([v, label]) => chip(label, () => timeChoice(picked) === v, () => { Object.assign(picked, timePicked(timeChoice(picked) === v ? 0 : v)); }));
 
   function changed() {
     // the address follows what is picked, without adding a step to Back for every letter typed
@@ -35,11 +37,11 @@ export function browse(app, data, route) {
   function draw() {
     for (const b of chapterChips.concat(timeChips)) b.setAttribute("aria-pressed", String(b._isOn()));
     const found = narrow(data.recipes, picked);
-    const narrowed = Boolean(picked.query.trim() || picked.chapter || picked.maxMinutes);
+    const narrowed = Boolean(picked.query.trim() || picked.chapter || timeChoice(picked));
     count.textContent = countText(found.length, "recipe", "recipes") + (narrowed ? " of " + data.recipes.length : "");
     results.replaceChildren();
     if (!found.length) {
-      const onlyChapter = picked.chapter && !picked.query.trim() && !picked.maxMinutes;
+      const onlyChapter = picked.chapter && !picked.query.trim() && !timeChoice(picked);
       results.append(h("p", { class: "empty" }, onlyChapter ? "Nothing in " + picked.chapter + " yet."
         : "Nothing matches that. Try one word, like an ingredient, or take a filter off."));
       return;

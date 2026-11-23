@@ -1,11 +1,12 @@
 // Draft: the recipe format as a form, with a live preview drawn by the same code as a real recipe page.
 // Drafts save themselves on this device as he types. Nothing here writes to the site.
 // Addresses: #/draft (the list of drafts and an empty form), #/draft/<id> (one saved draft),
-// #/draft?copy=<recipe id> (a recipe opened as a draft; it is only saved once something in it changes).
+// #/draft?copy=<recipe id> (a recipe opened as a draft; it is only saved once something in it changes, and
+// is taken off the device again if it is changed back to read exactly as the recipe does).
 import { h, statusLine, copyWithFallback, download, ask, dayAndTime } from "../dom.js";
-import { minutesText, isoStamp, chapterList, storageCanLapse, MAX_MINUTES } from "../lib.js";
-import { CHAPTERS, JOKE, emptyFields, fieldsBlank, totalMinutes, timeProblem, draftFromRecipe, draftChanged, recipeFromDraft, draftProblems,
-  recipeFileText, recipeFileName } from "../recipe-format.js";
+import { totalText, isoStamp, chapterList, minDays, MAX_MINUTES, MAX_DAYS } from "../lib.js";
+import { CHAPTERS, JOKE, emptyFields, totalMinutes, timeProblem, draftFromRecipe, draftChanged, nothingToKeep, recipeFromDraft, draftProblems,
+  recipeFileText, recipeFileName, daysFromField, daysField, daysWords, daysProblem } from "../recipe-format.js";
 import { recipeHead, recipeColumns } from "../recipe-view.js";
 import * as state from "../state.js";
 import { SITE_TITLE } from "./home.js";
@@ -68,15 +69,30 @@ export function draft(app, data, route) {
     app.className = "";
     app.replaceChildren(h("h1", {}, "Draft"), h("p", {}, line), h("p", {}, h("a", { href }, linkText)));
   };
+  // A copy with nothing of his own in it is not worth keeping, but only while the site still has the very
+  // recipe it was copied from (same address, same version). If the recipe has gone, or the copy is of a
+  // version the site does not have yet, the copy may be the only place its words are, and it stays.
+  const siteOf = (x) => (x.origin ? data.recipes.find((r) => r.id === x.origin.id) || null : null);
+  const siteVersion = (x) => (siteOf(x) ? siteOf(x).version : 0);
+  const sameAsSite = (x) => Boolean(x.origin) && nothingToKeep(x) && siteVersion(x) === x.origin.version;
+  // The same copy after the recipe has moved on (the site has a later version). It still holds nothing of his
+  // own, only the older words, so when it is opened it is let go and a copy of the recipe as it is now opens.
+  const behindSite = (x) => Boolean(x.origin) && nothingToKeep(x) && siteVersion(x) > x.origin.version;
   let d = null, opened = false; // opened: this page is about one draft (saved, or a copy of a recipe), not the list
   if (route.arg) {
     d = state.draft(route.arg);
     if (!d) return plainPage("That draft isn't on this device.", "#/draft", "All drafts");
+    if (sameAsSite(d) || behindSite(d)) { // kept by an earlier visit although nothing in it is his own
+      state.deleteDraft(d.id);
+      d = draftFromRecipe(siteOf(d), null, Date.now());
+      history.replaceState(null, "", "#/draft?copy=" + d.origin.id);
+    }
     opened = true;
   } else if (route.query.has("copy")) {
     const r = data.recipes.find((x) => x.id === route.query.get("copy"));
     if (!r) return plainPage("That recipe is not here.", "#/browse", "Browse the recipes");
-    const mine = state.drafts().find((x) => x.origin && x.origin.id === r.id && !x.separate);
+    let mine = state.drafts().find((x) => x.origin && x.origin.id === r.id && !x.separate) || null;
+    if (mine && (sameAsSite(mine) || behindSite(mine))) { state.deleteDraft(mine.id); mine = null; }
     d = mine || draftFromRecipe(r, null, Date.now()); // a copy he already changed is carried on with; a new one waits for its first change
     if (mine) { history.replaceState(null, "", "#/draft/" + mine.id); }
     opened = true;
@@ -112,8 +128,50 @@ export function draft(app, data, route) {
   const quick = QUICK.map(([n, label]) => h("button", { type: "button", class: "chip", "data-minutes": String(n), onclick: () => {
     hours.value = n >= 60 ? String(Math.floor(n / 60)) : "";
     minutes.value = n % 60 ? String(n % 60) : "";
+    settleDays();
     changed();
   } }, label));
+  // How many days the recipe needs, first step to eating: the same day, or 2 to 14. It goes into the recipe
+  // file as "days" and is the tag a reader sees ("2-day recipe").
+  const days = h("select", { id: "f-days", "aria-describedby": "h-days" },
+    h("option", { value: "" }, daysWords(1)),
+    Array.from({ length: MAX_DAYS - 1 }, (_, n) => n + 2).map((n) => h("option", { value: String(n), selected: daysFromField(f.days) === n }, daysWords(n))));
+  const daysNote = h("p", { class: "say", id: "days-note", role: "status" });
+  let moved = null; // the last time the control moved by itself, { from, to }, so it can go back when the time stops asking for it
+  let daysSaid = ""; // why it moved, in words, until the next thing happens to it
+
+  // A number box can hold text the browser will not hand over ("--", "1e"). The box then reads as empty, so
+  // without this the time would count as blank without a word.
+  const timeUnread = () => hours.validity.badInput || minutes.validity.badInput;
+
+  function settleDays() {
+    // Called when the total time changes (typed, or a one-tap time), never when he picks from the control
+    // himself. 24 hours or more cannot be the same day, so the control goes to the fewest days the time allows
+    // and says why. If the time then drops again (24 typed where 24 minutes was meant), it goes back.
+    // While a time box holds something that is not a number (a slip of the finger: "24e") there is no time to
+    // go by, so the control stays where it is until the box is put right.
+    if (timeProblem({ hours: hours.value, minutes: minutes.value }, timeUnread())) return;
+    const least = minDays(totalMinutes({ hours: hours.value, minutes: minutes.value }));
+    const now = daysFromField(days.value);
+    const mine = moved && moved.to === days.value; // it is still where it was moved to
+    if (least > now) {
+      moved = { from: mine ? moved.from : days.value, to: daysField(least) };
+      days.value = moved.to;
+      daysSaid = "The total time is " + (least - 1) * 24 + " hours or more, so this is set to " + daysWords(least) + ".";
+    } else if (mine && least < now) {
+      const was = daysFromField(moved.from), back = Math.max(was, least);
+      days.value = daysField(back);
+      daysSaid = "The total time is under " + (now - 1) * 24 + " hours now, so this is " + (back === was ? "back to " : "set to ") + daysWords(back) + ".";
+      moved = back > was ? { from: moved.from, to: days.value } : null;
+    } else if (!mine) {
+      daysSaid = "";
+    }
+  }
+  hours.addEventListener("input", settleDays);
+  minutes.addEventListener("input", settleDays);
+  const daysPicked = () => { moved = null; daysSaid = ""; }; // his own pick stands; too few for the time is said, not changed
+  days.addEventListener("input", daysPicked);
+  days.addEventListener("change", daysPicked);
   const timeText = text("f-time-text", "timeText", { "aria-describedby": "h-time-text" });
   const serves = text("f-serves", "serves", { "aria-describedby": "h-serves" });
   const headnote = area("f-headnote", "headnote", 3);
@@ -129,6 +187,7 @@ export function draft(app, data, route) {
     f.chapter = chapter.value === OTHER ? chapterOther.value : chapter.value;
     f.hours = hours.value;
     f.minutes = minutes.value;
+    f.days = days.value;
     f.timeText = timeText.value;
     f.serves = serves.value;
     f.headnote = headnote.value;
@@ -140,15 +199,21 @@ export function draft(app, data, route) {
     d.separate = separate.checked;
   }
 
+  function timeRefused() {
+    // the time boxes hold something no recipe file can be made from, said in plain words; "" when they do not
+    if (timeProblem(f, timeUnread())) return timeProblem(f, timeUnread());
+    return totalMinutes(f) > MAX_MINUTES ? "The total time can be two weeks at most." : "";
+  }
+
   function timeWords() {
     // what the two time boxes come to, read back in words, with a nudge when the number looks like a slip
     const total = totalMinutes(f);
-    if (timeProblem(f)) return timeProblem(f);
+    if (timeRefused()) return timeRefused();
     if (total <= 0) return "No total time yet. The start time and the calendar file are worked out from it.";
-    if (total > MAX_MINUTES) return "The total time can be two weeks at most.";
     const fromRecipe = Boolean(d.origin) && total === d.origin.total_minutes;
     const manyHours = Number(String(f.hours).trim().replace(",", ".")) >= 24;
-    return "Takes " + minutesText(total) + ", start to finish."
+    // with 2 days or more picked the total is said in hours, so "1 day" never sits beside "2 days"
+    return "Takes " + totalText(total, daysFromField(f.days)) + ", start to finish."
       + (fromRecipe && d.origin.estimated ? " This number is a guess that came with the recipe. Change it and it counts as yours." : "")
       + (manyHours && !fromRecipe ? " That is a day or more. If you meant minutes, move the number to the minutes box." : "");
   }
@@ -156,13 +221,22 @@ export function draft(app, data, route) {
   function show() {
     const total = totalMinutes(f);
     say(takes, timeWords());
+    // A line that refuses (no recipe file can be made) is in the warning colour, like the list of what is
+    // missing at the foot of the form. A line that only tells what happened keeps the plain colour.
+    takes.classList.toggle("warn", Boolean(timeRefused()));
+    // too few days for the time is said here, beside the control, as well as with the other things that are
+    // missing, and the control itself is marked as holding something that will not do
+    const tooFew = daysProblem(f);
+    say(daysNote, tooFew || daysSaid);
+    daysNote.classList.toggle("warn", Boolean(tooFew));
+    if (tooFew) days.setAttribute("aria-invalid", "true"); else days.removeAttribute("aria-invalid");
     for (const b of quick) b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === total));
     chapterOtherField.hidden = chapter.value !== OTHER;
 
-    const recipe = recipeFromDraft(d, isoStamp(Date.now()));
+    const recipe = recipeFromDraft(d, isoStamp(Date.now()), siteVersion(d));
     preview.replaceChildren(...recipeHead(recipe, { preview: true }).filter(Boolean), recipeColumns(recipe, { preview: true }));
 
-    const problems = draftProblems(d);
+    const problems = draftProblems(d, { timeUnread: timeUnread() });
     needed.textContent = problems.length ? "No recipe file yet. " + problems.join(" ") : "Nothing is missing. The recipe file is ready.";
     needed.classList.toggle("ok", !problems.length);
     const replaces = data.recipes.find((r) => r.id === recipe.id);
@@ -172,7 +246,13 @@ export function draft(app, data, route) {
     fileBox.value = problems.length ? "" : recipeFileText(recipe);
     fileNote.textContent = problems.length ? "The file shows up here once nothing is missing."
       : "This is " + recipeFileName(recipe) + ", version " + recipe.version + "."
-        + (own ? (draftChanged(d) ? " It is a changed copy of " + d.origin.title + " and replaces it on the site." : " Nothing is changed, so it is the same file the site has now.") : "");
+        + (own ? (draftChanged(d)
+          ? (siteVersion(d) > d.origin.version
+            // the copy was made before the recipe last changed on the site, so its file would undo that change
+            ? " It is a changed copy of " + d.origin.title + " as it was at version " + d.origin.version + ". The site has a later version now, version " + siteVersion(d) + ", and this file replaces that one."
+            : " It is a changed copy of " + d.origin.title + " and replaces it on the site.")
+          : siteVersion(d) > d.origin.version ? " Nothing is changed in this copy, and the site has a later version now, version " + siteVersion(d) + "."
+            : " Nothing is changed, so it is the same file the site has now.") : "");
   }
 
   function setAddress(hash) {
@@ -183,11 +263,12 @@ export function draft(app, data, route) {
   function changed() {
     read();
     // Nothing is kept until there is something to keep: an empty new draft, or a copy of a recipe with nothing
-    // changed, is not a draft yet. One that goes back to that is taken off the device again.
-    const nothingYet = d.origin ? !draftChanged(d) && !d.separate : fieldsBlank(f);
-    if (nothingYet) {
-      if (d.id && !d.origin) { state.deleteDraft(d.id); d.id = null; setAddress("#/draft"); }
-      if (!d.id) { show(); return; }
+    // changed, is not a draft yet. One that goes back to that (a form emptied again, a copy changed back) is
+    // taken off the device again, and the address goes back to the one that makes it afresh.
+    if (d.origin ? sameAsSite(d) : nothingToKeep(d)) {
+      if (d.id) { state.deleteDraft(d.id); d.id = null; setAddress(d.origin ? "#/draft?copy=" + d.origin.id : "#/draft"); }
+      show();
+      return;
     }
     d.touched = Date.now();
     if (!d.id) {
@@ -201,10 +282,10 @@ export function draft(app, data, route) {
   function finished() {
     // the recipe, or null with the reasons said in the status line
     read();
-    const problems = draftProblems(d);
+    const problems = draftProblems(d, { timeUnread: timeUnread() });
     copyHost.replaceChildren();
     if (problems.length) { status.textContent = "No recipe file yet. " + problems.join(" "); return null; }
-    return recipeFromDraft(d, isoStamp(Date.now()));
+    return recipeFromDraft(d, isoStamp(Date.now()), siteVersion(d));
   }
 
   const form = h("div", { class: "form" },
@@ -222,6 +303,10 @@ export function draft(app, data, route) {
         h("label", { class: "field inline", for: "f-minutes" }, minutes, h("span", {}, "minutes"))),
       h("div", { class: "chips", role: "group", "aria-label": "Common times" }, quick),
       takes),
+    h("div", { class: "days-field" },
+      h("label", { class: "field", for: "f-days" }, h("span", {}, "Days it needs"), days,
+        h("small", { id: "h-days" }, "Pick 2 days for a recipe that starts the day before: an overnight soak, a marinade, a dough that rests until tomorrow.")),
+      daysNote),
     h("label", { class: "field", for: "f-time-text" }, h("span", {}, "The time in your own words"), timeText,
       h("small", { id: "h-time-text" }, "If you like. For example: an hour including prep.")),
     h("label", { class: "field", for: "f-serves" }, h("span", {}, "Serves"), serves,
@@ -266,8 +351,10 @@ export function draft(app, data, route) {
       } }, "Delete this draft")),
     askHost);
 
-  const lapse = storageCanLapse(navigator)
-    ? h("p", { class: "small quiet" }, "Safari can clear what a site keeps on a device after a week without a visit. To keep a draft for good, download its recipe file. Adding the site to the Home Screen or the Dock also stops the clearing.")
+  // True of some browsers on any kind of device, so it is said to everyone, as a fact, with the one thing that
+  // always works. (When nothing is being kept at all, the line above already says so.)
+  const lapse = state.keeping()
+    ? h("p", { class: "small quiet lapse" }, "Some browsers clear what a site keeps on a device after a week or so without a visit. To keep a draft for good, download its recipe file.")
     : null;
 
   app.className = "";

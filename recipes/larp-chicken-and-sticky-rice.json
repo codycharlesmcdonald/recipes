@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "id": "larp-chicken-and-sticky-rice",
-  "version": 1,
+  "version": 2,
   "created": "2026-11-22T22:40:00Z",
-  "updated": "2026-11-22T22:40:00Z",
+  "updated": "2026-11-23T01:36:26Z",
   "title": "Larp Chicken & Sticky Rice",
   "section": "Grub",
   "headnote": "This is my mom’s favorite Thai dish. It’s just really fuckin good. You do need a thai rice basket for this.",
@@ -12,6 +12,7 @@
   "total_minutes": 1440,
   "total_minutes_estimated": true,
   "active_minutes": 50,
+  "days": 2,
   "tags": [
     "chicken",
     "rice",

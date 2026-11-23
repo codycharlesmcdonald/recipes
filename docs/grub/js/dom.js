@@ -62,14 +62,17 @@ export async function copyText(text) {
 }
 
 // Copies, and says what happened. When the browser will not copy, the text is put in a box to select by hand.
+// The box is at most 12 lines tall and scrolls inside, so a long list does not push the page away. It takes
+// the place of whatever the host held: a second press while the first is still being answered leaves one box.
 export async function copyWithFallback(text, status, host, okMessage) {
   host.replaceChildren();
   if (await copyText(text)) { status.textContent = okMessage; return true; }
   status.textContent = "This browser would not copy. The text is in the box below: select it and copy it.";
   const box = h("textarea", { class: "copybox", readOnly: true, rows: String(Math.min(12, text.split("\n").length + 1)), "aria-label": "Text to copy", value: text });
-  host.append(box);
+  host.replaceChildren(box);
   box.focus();
   box.select();
+  box.scrollTop = 0; // selecting to the end leaves a long list showing its last lines; it should show its first
   return false;
 }
 

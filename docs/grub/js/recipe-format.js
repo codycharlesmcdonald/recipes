@@ -1,10 +1,12 @@
 // The recipe format as text boxes, and back. Pure: no page, no clock, no storage. Tested in tests/index.html.
-import { slug, ingredientText, MAX_MINUTES } from "./lib.js";
+import { slug, ingredientText, minDays, MAX_MINUTES, MAX_DAYS } from "./lib.js";
 
-export { MAX_MINUTES };
 export const CHAPTERS = ["Brekky", "Basics", "Grub", "Drank", "SWEETS"];
 export const JOKE = "Joke:";
-const LIST_MARK = /^(\d+[.)]|[-*•])\s+/; // "1. ", "2) ", "- ": what a pasted list puts in front of each line
+// "1. ", "2) ", "- ": what a pasted list puts in front of each line. A list number is one or two digits. A
+// longer number with a full stop after it is part of the sentence ("1985. The year nana wrote this down.",
+// "350. No hotter than that.") and stays.
+const LIST_MARK = /^(\d{1,2}[.)]|[-*•])\s+/;
 
 const UNITS = new Set(("teaspoon teaspoons tsp tablespoon tablespoons tbsp tbs cup cups oz ounce ounces lb lbs pound pounds "
   + "g gram grams kg ml l liter liters litre litres quart quarts qt pint pints pt gallon gallons clove cloves slice slices "
@@ -106,19 +108,52 @@ export function parseIngredients(text, known = []) {
   });
 }
 
-export function parseSteps(text) {
-  // The page numbers the steps itself, so a number or bullet that came with a pasted list is taken off.
-  return textToGroups(text, (line) => line.replace(LIST_MARK, "") || line);
+function unlisted(line) {
+  // A line without the "1. ", "2) " or "- " a pasted list put in front of it. Only a number of one or two
+  // digits followed by a full stop or a bracket and then a space is a list number: "2 cups is plenty",
+  // "2.5 cups" and "350. No hotter." are left alone.
+  return line.replace(LIST_MARK, "") || line;
 }
 
-function lines(text) {
-  // one tip per line; a bullet that came with a pasted list is taken off, because the page adds its own
-  return String(text).split(/\r?\n/).map((x) => x.replace(/\s+/g, " ").trim().replace(/^[-*•]\s+/, "")).filter(Boolean);
+export function parseSteps(text) {
+  // The page numbers the steps itself, so a number or bullet that came with a pasted list is taken off.
+  return textToGroups(text, unlisted);
+}
+
+export function parseTips(text) {
+  // one tip per line; a number or bullet that came with a pasted list is taken off, because the page adds its own
+  return String(text).split(/\r?\n/).map((x) => unlisted(x.replace(/\s+/g, " ").trim())).filter(Boolean);
 }
 
 export function emptyFields() {
-  return { title: "", chapter: "", hours: "", minutes: "", timeText: "", serves: "", headnote: "",
+  // days is what the "Days it needs" control shows: "" for the same day, or "2" to "14"
+  return { title: "", chapter: "", hours: "", minutes: "", days: "", timeText: "", serves: "", headnote: "",
     ingredients: "", steps: "", tips: "", credit: "", tags: "" };
+}
+
+export function daysFromField(value) {
+  // the days box as a number: 1 for the same day (an empty box, or anything that is not a whole number from 2 to 14)
+  const t = String(value === null || value === undefined ? "" : value).trim();
+  const n = /^\d{1,2}$/.test(t) ? Number(t) : 1;
+  return n >= 2 && n <= MAX_DAYS ? n : 1;
+}
+
+export function daysField(n) {
+  // and back: what the control holds for a number of days
+  return Number.isInteger(n) && n >= 2 && n <= MAX_DAYS ? String(n) : "";
+}
+
+export function daysWords(n) {
+  // how the control names a number of days
+  return n >= 2 ? n + " days" : "Same day";
+}
+
+export function daysProblem(fields) {
+  // Said in plain words when the total time cannot fit in the days picked: 24 hours or more is never one day.
+  const least = minDays(totalMinutes(fields));
+  return least > daysFromField(fields.days)
+    ? "The total time is " + (least - 1) * 24 + " hours or more, so this recipe needs at least " + least + " days. Under Days it needs, pick " + daysWords(least) + (least < MAX_DAYS ? " or more." : ".")
+    : "";
 }
 
 export function fieldsFromRecipe(r) {
@@ -128,6 +163,7 @@ export function fieldsFromRecipe(r) {
     chapter: r.section || "",
     hours: total >= 60 ? String(Math.floor(total / 60)) : "",
     minutes: total % 60 ? String(total % 60) : "",
+    days: daysField(r.days),
     timeText: r.time_text || "",
     serves: r.yield || "",
     headnote: r.headnote || "",
@@ -151,9 +187,11 @@ function timeBox(value) {
   return /^\d+([.,]\d+)?$/.test(t) ? Number(t.replace(",", ".")) : NaN;
 }
 
-export function timeProblem(fields) {
-  // said in plain words when a time box holds something that is not a plain number (a minus sign, a word)
-  return Number.isNaN(timeBox(fields.hours)) || Number.isNaN(timeBox(fields.minutes))
+export function timeProblem(fields, unread = false) {
+  // Said in plain words when a time box holds something that is not a plain number (a minus sign, a word).
+  // unread is true when the browser is holding text in a number box that it will not hand over ("--", "1e":
+  // the box then reads as empty, with validity.badInput set). That is the same problem and is said the same way.
+  return unread || Number.isNaN(timeBox(fields.hours)) || Number.isNaN(timeBox(fields.minutes))
     ? "The time boxes take numbers only, like 1 hour 30 minutes." : "";
 }
 
@@ -211,16 +249,26 @@ export function draftChanged(draft) {
   return Object.keys(draft.origin.fields).some((k) => draft.fields[k] !== draft.origin.fields[k]);
 }
 
-export function recipeFromDraft(draft, nowIso) {
+export function nothingToKeep(draft) {
+  // True while a draft holds nothing of his own: a new one with every box empty, or a copy of a recipe that
+  // reads exactly as the recipe does and is not marked to be kept as a separate recipe. That covers a copy
+  // that was changed and then changed back.
+  return draft.origin ? !draftChanged(draft) && !draft.separate : fieldsBlank(draft.fields);
+}
+
+export function recipeFromDraft(draft, nowIso, siteVersion = 0) {
   // The recipe file, with the keys in the order the files in recipes/ use. A draft made from a recipe and left
   // as it was gives that recipe back. A changed one keeps the recipe's address and goes up one version, unless
   // it was marked as a separate recipe, which gets an address from its title like a new draft does.
+  // siteVersion is the version the site has of that recipe now (0 when it is not known, or the recipe has
+  // gone). A copy made before the recipe moved on is numbered from the site's version, so a changed copy of
+  // version 1 is never handed over as the version 2 the site already has.
   const f = draft.fields, o = draft.separate ? null : draft.origin || null;
   const changed = draftChanged(draft);
   const total = totalMinutes(f);
   const out = { schema: 1 };
   out.id = o ? o.id : slug(f.title);
-  out.version = o ? o.version + (changed ? 1 : 0) : 1;
+  out.version = o ? (changed ? Math.max(o.version, Number.isInteger(siteVersion) ? siteVersion : 0) + 1 : o.version) : 1;
   out.created = o ? o.created : nowIso;
   out.updated = o && !changed ? o.updated : nowIso;
   out.title = f.title.trim();
@@ -233,23 +281,26 @@ export function recipeFromDraft(draft, nowIso) {
   const from = draft.origin || null; // a guess stays a guess, and the hands-on time stays, only while they still fit
   if (from && from.estimated && total === from.total_minutes) out.total_minutes_estimated = true;
   if (from && from.active_minutes && from.active_minutes <= total) out.active_minutes = from.active_minutes;
+  if (daysFromField(f.days) > 1) out.days = daysFromField(f.days); // left out for a recipe made the same day
   out.tags = f.tags.split(",").map((x) => x.trim()).filter(Boolean);
   out.ingredients = parseIngredients(f.ingredients, from ? from.known : []);
   out.steps = parseSteps(f.steps);
-  const notes = lines(f.tips);
+  const notes = parseTips(f.tips);
   if (notes.length) out.notes = notes;
   return out;
 }
 
-export function draftProblems(draft) {
-  // what stops a draft from being saved as finished, each in plain words; an empty list means it is ready
+export function draftProblems(draft, { timeUnread = false } = {}) {
+  // what stops a draft from being saved as finished, each in plain words; an empty list means it is ready.
+  // timeUnread: a time box on the page holds text the browser will not hand over (see timeProblem).
   const f = draft.fields, r = recipeFromDraft(draft, "");
   const out = [];
   if (!f.title.trim()) out.push("It needs a title.");
   else if (!r.id) out.push("The title needs at least one letter or number, because the recipe's address is made from it.");
-  if (timeProblem(f)) out.push(timeProblem(f));
+  if (timeProblem(f, timeUnread)) out.push(timeProblem(f, timeUnread));
   else if (r.total_minutes <= 0) out.push("It needs a total time above zero. The start time and the calendar file are worked out from it.");
   else if (r.total_minutes > MAX_MINUTES) out.push("The total time can be two weeks at most.");
+  else if (daysProblem(f)) out.push(daysProblem(f));
   if (!r.ingredients.some((g) => g.items.some((i) => i.name))) out.push("It needs at least one ingredient.");
   if (!r.steps.length) out.push("It needs at least one step.");
   return out;

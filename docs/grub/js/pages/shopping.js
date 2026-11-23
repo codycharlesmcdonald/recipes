@@ -1,11 +1,14 @@
-// Shopping: one running list, grouped by the recipe each thing came from.
-// The page reads in the order it is used: what to do with the list first (so Send to Reminders is at the top
-// on a phone and early for the keyboard), then the list, then a box to add something, then the one-time help.
+// Shopping: one running list, grouped by the recipe each thing came from. The list lives here, in the site.
+// The way out of it is Copy list: the things still to get as plain lines, to paste wherever a list is kept.
+// The page reads in the order it is used: what to do with the list first (so Copy list is at the top on a
+// phone and early for the keyboard), then the list, then a box to add something.
 import { h, put, crossIcon, statusLine, copyWithFallback, ask } from "../dom.js";
-import { shortcutUrl, SHORTCUT_NAME, amountText } from "../lib.js";
-import { addOwn, setGot, removeItem, clearTicked, counts, groups, sendLines } from "../shopping-list.js";
+import { amountText } from "../lib.js";
+import { addOwn, setGot, removeItem, clearTicked, counts, groups, copyLines } from "../shopping-list.js";
 import * as state from "../state.js";
 import { SITE_TITLE } from "./home.js";
+
+const NOTHING_TO_COPY = "Everything is ticked, so there is nothing to copy.";
 
 export function shopping(app) {
   document.title = "Shopping | " + SITE_TITLE;
@@ -14,20 +17,12 @@ export function shopping(app) {
   const status = statusLine();
   const askHost = h("div", {});
   const copyHost = h("div", {});
-  // Send to Reminders is a link, because it opens a shortcuts:// address. With nothing left to send it has no
-  // address, and a press (mouse or keyboard) says why.
-  const sent = () => {
-    status.textContent = send.hasAttribute("href")
-      ? "Sent to Shortcuts. If nothing happened, use Copy list and paste it into Reminders."
-      : "Everything is ticked, so there is nothing to send.";
-  };
-  const send = h("a", { class: "btn primary", onclick: sent, onkeydown: (e) => {
-    if (!send.hasAttribute("href") && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); sent(); }
-  } }, "Send to Reminders");
-  const copy = h("button", { type: "button", onclick: () => {
-    const lines = sendLines(state.shopping());
-    if (!lines.length) { status.textContent = "Nothing to copy. Everything on the list is ticked."; return; }
-    copyWithFallback(lines.join("\n"), status, copyHost, "Copied " + lines.length + ". Open Reminders, Shopping List, and paste.");
+  // With nothing left to copy the button stays where the keyboard can reach it, marked as unavailable, and
+  // says why: in its tooltip for the mouse, and in the status line when it is pressed.
+  const copy = h("button", { type: "button", class: "primary", onclick: () => {
+    const lines = copyLines(state.shopping());
+    if (!lines.length) { copyHost.replaceChildren(); status.textContent = NOTHING_TO_COPY; return; }
+    copyWithFallback(lines.join("\n"), status, copyHost, "Copied " + lines.length + ". Paste it wherever you keep your list.");
   } }, "Copy list");
   const clearGot = h("button", { type: "button", onclick: () => {
     const before = state.shopping(), after = clearTicked(before);
@@ -44,7 +39,7 @@ export function shopping(app) {
       own.focus({ preventScroll: true });
     }, () => clearAll.focus());
   } }, "Clear all");
-  const actions = h("div", { class: "stack" }, send, h("div", { class: "split" }, copy, clearGot, clearAll));
+  const actions = h("div", { class: "stack" }, copy, h("div", { class: "split" }, clearGot, clearAll));
 
   const own = h("input", { type: "text", id: "own-item", autocomplete: "off", enterkeyhint: "done" });
   const ownForm = h("form", { class: "add-own", onsubmit: (e) => {
@@ -63,10 +58,8 @@ export function shopping(app) {
     summary.textContent = list.length ? c.toGet + " to get" + (c.got ? ", " + c.got + " got" : "") + ". " + state.keptWords("Kept on this device.") : "";
     copyHost.replaceChildren();
     askHost.replaceChildren();
-    const lines = sendLines(list);
-    // with nothing left to send the button stays where the keyboard can reach it and says why when pressed
-    if (lines.length) { send.setAttribute("href", shortcutUrl(lines)); send.removeAttribute("aria-disabled"); send.removeAttribute("tabindex"); }
-    else { send.removeAttribute("href"); send.setAttribute("aria-disabled", "true"); send.setAttribute("tabindex", "0"); }
+    if (copyLines(list).length) { copy.removeAttribute("aria-disabled"); copy.removeAttribute("title"); }
+    else { copy.setAttribute("aria-disabled", "true"); copy.setAttribute("title", NOTHING_TO_COPY); }
     actions.hidden = !list.length;
 
     if (!list.length) {
@@ -97,27 +90,17 @@ export function shopping(app) {
   }
 
   function redrawKeeping(key) {
-    // after a tick the list is drawn again; put the keyboard back on the box that was ticked
+    // after a tick the list is drawn again; put the keyboard back on the box that was ticked. What the status
+    // line said was about the list before the tick ("Everything is ticked", "Copied 14"), so it is emptied.
     draw();
+    status.textContent = "";
     for (const li of body.querySelectorAll("li[data-key]")) if (li.dataset.key === key) li.querySelector("input").focus({ preventScroll: true });
   }
-
-  const help = h("details", { class: "help" },
-    h("summary", {}, "Set up Send to Reminders (once, on the iPhone)"),
-    h("p", {}, "Send to Reminders hands the list to a Shortcut named " + SHORTCUT_NAME + ", which adds each line to your Shopping List in Reminders. Make it once:"),
-    h("ol", {},
-      h("li", {}, "Open the Shortcuts app and start a new shortcut. Name it " + SHORTCUT_NAME + "."),
-      h("li", {}, "Add the action Split Text. Tap the blue word in it and choose Shortcut Input. Leave it on New Lines."),
-      h("li", {}, "Add the action Repeat with Each."),
-      h("li", {}, "Inside the repeat, add the action Add New Reminder. Set the reminder to Repeat Item and the list to Shopping List."),
-      h("li", {}, "Press Done."),
-      h("li", {}, "Come back here and press Send to Reminders. The first time, allow it.")),
-    h("p", { class: "quiet small" }, "On a Mac without the Shortcut, Copy list and paste into Reminders does the same job."));
 
   app.className = "";
   put(app, h("h1", {}, "Shopping"), summary,
     h("div", { class: "cols side" },
       h("div", { class: "right sticky" }, actions, askHost, status, copyHost),
-      h("div", { class: "left" }, body, ownForm, help)));
+      h("div", { class: "left" }, body, ownForm)));
   draw();
 }

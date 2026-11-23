@@ -1,30 +1,43 @@
 // Drives the real pages: loads ../index.html in a frame on the same origin, goes to an address, clicks, types
 // and reads what the page shows. Loaded only by flows.js, and only on this computer (see local-only.js),
 // because it empties and fills the site's own storage. Run with tools/run_tests.py <site> tests/flows.html
-import { haystack, narrow, chapterList, chapterOf, mergedLines, shortcutUrl } from "../js/lib.js";
+import { haystack, narrow, chapterList, chapterOf, mergedLines, daysLabel, shortTime, totalText, timeFacts } from "../js/lib.js";
 import { realIngredients } from "../js/shopping-list.js";
+import { draftFromRecipe } from "../js/recipe-format.js";
 import { dateValue, defaultDay } from "../js/plan.js";
 import { NOT_KEPT } from "../js/state.js";
 
 const frame = document.getElementById("site");
 const lines = [];
 let failed = 0;
+function say(line) {
+  // every line goes onto the page as it is made, so a run that stops part-way shows how far it got
+  lines.push(line);
+  document.getElementById("out").textContent = lines.join("\n");
+}
 function check(name, got, want) {
   const ok = JSON.stringify(got) === JSON.stringify(want);
   if (!ok) failed += 1;
-  lines.push((ok ? "ok   " : "FAIL ") + name + (ok ? "" : "\n     got  " + JSON.stringify(got) + "\n     want " + JSON.stringify(want)));
+  say((ok ? "ok   " : "FAIL ") + name + (ok ? "" : "\n     got  " + JSON.stringify(got) + "\n     want " + JSON.stringify(want)));
 }
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
-async function until(what, fn, tries = 200) {
-  for (let n = 0; n < tries; n += 1) {
+// A wait ends the moment what it waits for is there. The time allowed is only ever used up when something is
+// wrong, so it is generous: a slow or busy computer must not turn into a failed check.
+const WAIT_MS = 20000;
+async function until(what, fn, ms = WAIT_MS) {
+  const end = performance.now() + ms;
+  for (;;) {
     let v = null;
     try { v = fn(); } catch { v = null; }
     if (v) return v;
+    if (performance.now() > end) throw new Error("waited for " + what);
     await sleep(10);
   }
-  throw new Error("waited for " + what);
 }
+// for a check that reads the page right after something that settles a moment later: waits for it, and if it
+// never comes lets the check itself say what was wrong
+const settled = (fn) => until("", fn, 3000).catch(() => null);
 
 const win = () => frame.contentWindow;
 const doc = () => frame.contentDocument;
@@ -32,23 +45,64 @@ const app = () => doc().getElementById("app");
 const $ = (sel) => doc().querySelector(sel);
 const $$ = (sel) => [...doc().querySelectorAll(sel)];
 const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : null);
-const button = (label) => $$("button, a.btn").find((b) => text(b) === label) || null;
+const button = (label) => $$("button").find((b) => text(b) === label) || null;
 const fire = (el, kind) => el.dispatchEvent(new (win().Event)(kind, { bubbles: true }));
 function type(el, value) { el.focus(); el.value = value; fire(el, "input"); }
 function pick(el, value) { el.value = value; fire(el, "input"); fire(el, "change"); }
+function typeKeys(el, keys) {
+  // typed the way a person types, in place of what the box held. A number box can then end up holding text
+  // the browser will not hand over ("1e", "--"): its value reads as empty and validity.badInput is true.
+  el.focus();
+  el.select();
+  doc().execCommand("insertText", false, keys);
+}
+// An address inside the site is "#..." or a relative path. One with a scheme (https:, data:, or an app's own)
+// or that starts at the server's root is a way out of it.
+const insideSite = (href) => href.startsWith("#") || !/^([a-z][a-z0-9+.-]*:|[/\\])/i.test(href);
+const linksOut = () => $$("a[href]").map((a) => a.getAttribute("href")).filter((x) => !insideSite(x));
 const focused = () => doc().activeElement;
 const noInnerScroll = (el) => [win().getComputedStyle(el).overflowY, el.scrollHeight <= el.clientHeight + 1, el.classList.contains("fits") || el.classList.contains("tall")];
 const sideways = () => Math.max(0, doc().documentElement.scrollWidth - win().innerWidth);
+const styleOf = (el) => win().getComputedStyle(el);
+// How far two colours are apart, counted the way the accessibility guidelines count it: 4.5 or more for words
+// to be read, 3 or more for the edge of a control. The colours are the browser's own "rgb(r, g, b)".
+function contrast(a, b) {
+  const light = (c) => {
+    const [r, g, bl] = c.match(/[\d.]+/g).slice(0, 3).map((v) => { const s = Number(v) / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [light(a), light(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+const pageColour = () => styleOf(doc().body).backgroundColor;
+
+// A file the site hands over (a recipe file, a calendar file) is caught before the browser saves it: a test
+// run must leave nothing in the Downloads folder, and the checks can read the name and the words of the file.
+const handed = [];
+function catchFiles() {
+  const proto = win().HTMLAnchorElement.prototype, real = proto.click;
+  proto.click = function click() {
+    if (!this.hasAttribute("download")) return real.call(this);
+    handed.push({ name: this.getAttribute("download"), words: fetch(this.href).then((x) => x.text()) });
+    return undefined;
+  };
+}
+async function lastFile() {
+  const file = handed.pop();
+  return file ? [file.name, await file.words] : [null, null];
+}
 
 let loads = 0;
 async function open(hash) {
   // a fresh load of the site at an address
   loads += 1;
   await new Promise((res) => { frame.addEventListener("load", res, { once: true }); frame.src = "../index.html?load=" + loads + hash; });
+  catchFiles();
   await until("the site at " + hash, () => app() && app().dataset.page);
 }
 async function reload() {
   await new Promise((res) => { frame.addEventListener("load", res, { once: true }); win().location.reload(); });
+  catchFiles();
   await until("the site after a reload", () => app() && app().dataset.page);
 }
 async function go(hash, page) {
@@ -64,12 +118,16 @@ function audit(where) {
   }
   for (const el of $$("button, a, summary")) if (!text(el) && !el.getAttribute("aria-label")) bad.push("no name: " + el.outerHTML.slice(0, 60));
   check(where + ": every field has a label and every control a name", bad, []);
+  // a status line has to be in the page before its words arrive, or a screen reader never hears them
+  check(where + ": no status line is taken out of the page while it is empty",
+    $$("[role=status]").filter((el) => win().getComputedStyle(el).display === "none").map((el) => el.className), []);
+  check(where + ": every link stays inside the site", linksOut(), []);
 }
 
 async function flow(name, fn) {
   try { await fn(); } catch (e) {
     failed += 1;
-    lines.push("FAIL " + name + " stopped: " + (e && e.message ? e.message : e));
+    say("FAIL " + name + " stopped: " + (e && e.message ? e.message : e));
   }
 }
 
@@ -177,7 +235,11 @@ try {
     check("recipe: his time is not called a guess", $(".guess"), null);
     check("recipe: in a computer window the ingredients start in the top third", $(".ingredients h2").getBoundingClientRect().top < 330, true);
     check("recipe: the ingredients column never scrolls inside itself", noInnerScroll($(".recipe .cols .left")), ["visible", true, true]);
-    if ("wakeLock" in win().navigator) check("recipe: Keep screen on sits with the steps", Boolean($(".method .steps-head #keep-on")), true);
+    if ("wakeLock" in win().navigator) {
+      check("recipe: Keep screen on sits with the steps", Boolean($(".method .steps-head #keep-on")), true);
+      check("recipe: its status line is in the page while it is empty, and takes no room there",
+        [$(".switch-note").getAttribute("role"), text($(".switch-note")), win().getComputedStyle($(".switch-note")).display === "none", $(".switch-note").getBoundingClientRect().height], ["status", "", false, 0]);
+    }
     check("recipe: a line for the paper names the cookbook and the chapter, and is not on the screen", [text($(".print-only")), win().getComputedStyle($(".print-only")).display], ["Hi, My Name is Food, Grub", "none"]);
     audit("recipe");
     // a window shorter than the ingredient list
@@ -185,14 +247,15 @@ try {
     await open("#/r/pad-thai-baby");
     await until("the ingredients marked taller than the window", () => $(".recipe .cols .left").classList.contains("tall"));
     win().scrollTo(0, 800);
-    await sleep(30);
+    await settled(() => Math.round($(".recipe .cols .left").getBoundingClientRect().bottom) === 500 - 16);
     const col = $(".recipe .cols .left").getBoundingClientRect();
     check("recipe: in a short window the ingredients ride up until their last line shows, then stay there beside the steps",
       [Math.round(col.bottom), col.top < 0, noInnerScroll($(".recipe .cols .left"))[0]], [500 - 16, true, "visible"]);
     frame.setAttribute("height", "900");
     await open("#/r/larp-chicken-and-sticky-rice");
     await go("#/r/larp-chicken-and-sticky-rice", "recipe");
-    check("recipe: a guessed total time is said to be a guess", text($(".guess")), "The total time is a guess. Plans count it as 1 day, and you can change that in Prep.");
+    check("recipe: a guessed total time is said to be a guess, counted in hours beside the tag", [text($(".guess")), /\d days?\b/.test(text($(".guess")))],
+      ["The total time is a guess. Plans count it as " + totalText(larp.total_minutes, larp.days) + ", and you can change that in Prep.", false]);
     await go("#/r/no-such-recipe", "recipe");
     check("recipe: an unknown id is said plainly", text($("#app p")), "That recipe is not here.");
     await go("#/nowhere", "missing");
@@ -265,14 +328,40 @@ try {
     check("shopping: grouped by recipe, each heading a link back", $$(".shop-group h2 a").map((a) => [text(a), a.getAttribute("href")]),
       [["Pad Thai, Baby", "#/r/pad-thai-baby"], ["Simple Bangin Burgers", "#/r/simple-bangin-burgers"]]);
     check("shopping: the things added are on the list", [items().length, text(items()[0].querySelector(".nm")), text(items()[0].querySelector(".amt"))], [wanted.length, "Garlic", "2 cloves"]);
-    check("shopping: Send to Reminders carries the list, the same thing from two recipes once",
-      [$("a.btn.primary").getAttribute("href"), mergedLines(wanted).includes("Garlic (2 cloves + 2 cloves)")], [shortcutUrl(mergedLines(wanted)), true]);
-    check("shopping: Send to Reminders comes before the list in the page, and sits to its right in a computer window",
-      [Boolean($(".stack").compareDocumentPosition($("ul.shop")) & 4), $(".cols.side .left").getBoundingClientRect().left < $(".stack").getBoundingClientRect().left,
-        Math.abs($(".stack").getBoundingClientRect().top - $(".cols.side .left").getBoundingClientRect().top) < 4], [true, true, true]);
+    check("shopping: Copy list is the main action, the one filled button, and it is a button, not a link",
+      [$$("#app .primary").map((b) => [b.tagName, text(b)]), button("Copy list").getAttribute("aria-disabled"), button("Copy list").title], [[["BUTTON", "Copy list"]], null, ""]);
+    check("shopping: Copy list comes before the list in the page, and sits to its right in a computer window",
+      [$(".stack").firstElementChild === button("Copy list"), Boolean($(".stack").compareDocumentPosition($("ul.shop")) & 4), $(".cols.side .left").getBoundingClientRect().left < $(".stack").getBoundingClientRect().left,
+        Math.abs($(".stack").getBoundingClientRect().top - $(".cols.side .left").getBoundingClientRect().top) < 4], [true, true, true, true]);
+    check("shopping: the list stays in the site: with things on it, the page has links, and every one stays inside the site", [$$("a[href]").length > 6, linksOut()], [true, []]);
+    // what the browser would have put on the clipboard is caught here, so the check can read it
+    let copied = null;
+    Object.defineProperty(win().navigator, "clipboard", { configurable: true, value: { writeText: async (words) => { copied = words; } } });
+    button("Copy list").click();
+    await settled(() => copied !== null && said());
+    check("shopping: Copy list copies what is left to get, one per line, the same thing from two recipes once with both amounts",
+      [copied, mergedLines(wanted).includes("Garlic (2 cloves + 2 cloves)"), mergedLines(wanted).length < wanted.length], [mergedLines(wanted).join("\n"), true, true]);
+    check("shopping: and says how many, and what to do next, naming no app", said(), "Copied " + mergedLines(wanted).length + ". Paste it wherever you keep your list.");
     items()[1].querySelector("input").click();
     check("shopping: tick one as got", [items()[1].className, text($(".count"))], ["got", (wanted.length - 1) + " to get, 1 got. Kept on this device."]);
-    check("shopping: a ticked thing is not sent", $("a.btn.primary").getAttribute("href"), shortcutUrl(mergedLines(wanted.filter((_, n) => n !== 1))));
+    copied = null;
+    button("Copy list").click();
+    await settled(() => copied !== null);
+    check("shopping: a ticked thing is not copied", copied, mergedLines(wanted.filter((_, n) => n !== 1)).join("\n"));
+    win().navigator.clipboard.writeText = async () => { throw new Error("refused by the test"); };
+    button("Copy list").click();
+    await settled(() => $(".copybox"));
+    check("shopping: where the browser will not copy, the list is put in a box to copy by hand, and the page says so",
+      [$(".copybox") && $(".copybox").value, said(), focused() === $(".copybox")],
+      [mergedLines(wanted.filter((_, n) => n !== 1)).join("\n"), "This browser would not copy. The text is in the box below: select it and copy it.", true]);
+    // pressed twice before the browser has answered the first press: still one box
+    let refusals = 0;
+    win().navigator.clipboard.writeText = async () => { refusals += 1; throw new Error("refused by the test"); };
+    button("Copy list").click();
+    button("Copy list").click();
+    await settled(() => refusals === 2 && $(".copybox")); // both presses clear the box at once, so it is back only when both are answered
+    check("shopping: Copy list pressed twice where copying is refused leaves one box, not two", [refusals, $$(".copybox").length, focused() === $(".copybox")], [2, 1, true]);
+    delete win().navigator.clipboard; // the browser's own again
     button("Clear ticked").click();
     check("shopping: clear ticked", [items().length, said()], [wanted.length - 1, "Took 1 off the list."]);
     type($("#own-item"), "Paper towels");
@@ -303,17 +392,30 @@ try {
     button("Clear all").click();
     button("Yes, clear it").click();
     check("shopping: cleared, and the keyboard is on the add box", [items().length, said(), button("Clear all").closest(".stack").hidden, focused() === $("#own-item")], [0, "The list is empty.", true, true]);
-    check("shopping: the Shortcut help is there, folded away, with the tap it needs and a try-it step",
-      [text($("details.help summary")), $("details.help").open, $$("details.help ol li").length, text($$("details.help ol li")[1]), text($$("details.help ol li").pop())],
-      ["Set up Send to Reminders (once, on the iPhone)", false, 6, "Add the action Split Text. Tap the blue word in it and choose Shortcut Input. Leave it on New Lines.",
-        "Come back here and press Send to Reminders. The first time, allow it."]);
+    check("shopping: with the list empty there is nothing folded away to set up, and still no link out of the site", [$("#app details"), $$("#app a[href]").length, linksOut()], [null, 0, []]);
     type($("#own-item"), "Milk");
     $("form.add-own").requestSubmit();
     items()[0].querySelector("input").click();
-    const send = $("a.btn.primary");
-    send.click();
-    check("shopping: with everything ticked, Send to Reminders says why it does nothing, to the mouse and to the keyboard",
-      [send.hasAttribute("href"), send.getAttribute("aria-disabled"), send.tabIndex, said()], [false, "true", 0, "Everything is ticked, so there is nothing to send."]);
+    const copyList = button("Copy list");
+    let asked = 0;
+    Object.defineProperty(win().navigator, "clipboard", { configurable: true, value: { writeText: async () => { asked += 1; } } });
+    copyList.focus();
+    copyList.click(); // Enter and Space on a button are this same press
+    check("shopping: with everything ticked, Copy list is marked as unavailable but can still be reached, and says why to the mouse and to the keyboard",
+      [copyList.getAttribute("aria-disabled"), copyList.disabled, copyList.tabIndex, focused() === copyList, copyList.title, said(), asked],
+      ["true", false, 0, true, "Everything is ticked, so there is nothing to copy.", "Everything is ticked, so there is nothing to copy.", 0]);
+    // It still answers a press, and a touch screen has no tooltip, so its words have to be readable: it is
+    // not faded. The fill goes and it rests as an outline, like no other state of the button.
+    const resting = styleOf(copyList);
+    check("shopping: unavailable, Copy list rests as a quiet outline whose words can still be read against the page",
+      [resting.opacity, resting.backgroundColor, contrast(resting.color, pageColour()) >= 4.5, contrast(resting.borderTopColor, pageColour()) >= 3, resting.cursor],
+      ["1", "rgba(0, 0, 0, 0)", true, true, "default"]);
+    items()[0].querySelector("input").click();
+    check("shopping: unticked again, Copy list is back, filled, and the page no longer says everything is ticked",
+      [button("Copy list").getAttribute("aria-disabled"), button("Copy list").title, said(), styleOf(button("Copy list")).backgroundColor === "rgba(0, 0, 0, 0)",
+        contrast(styleOf(button("Copy list")).color, styleOf(button("Copy list")).backgroundColor) >= 4.5], [null, "", "", false, true]);
+    items()[0].querySelector("input").click();
+    delete win().navigator.clipboard;
     button("Clear ticked").click();
     check("shopping: empty again", [items().length, focused() === $("#own-item")], [0, true]);
   });
@@ -346,6 +448,25 @@ try {
     check("prep: the timeline, earliest start first, ending with the meal: when, then what", timeline(),
       [start("Larp Chicken & Sticky Rice", 1440), start("Pad Thai, Baby", 60), eat]);
     if (clock(meal) === "6:30 PM") check("prep: the words of the timeline", [timeline()[1][0].endsWith(" at 5:30 PM"), timeline()[2][0].endsWith(" at 6:30 PM")], [true, true]);
+    // the Eat at box read as empty, as it does for a moment whenever a time is typed over
+    const keptPlan = () => JSON.parse(localStorage.getItem("grub.plan")).data;
+    type($("#plan-time"), "");
+    check("prep: with the Eat at box emptied, the day he set is left alone and the plan asks for a time",
+      [$("#plan-day").value, text($(".plan-out")), [keptPlan().date, keptPlan().dayChosen, keptPlan().time]], [day, "Pick a day and a time.", [day, true, ""]]);
+    $("ul.cooking li[data-id=pad-thai-baby] button.remove").click();
+    pick($("#plan-pick"), "pad-thai-baby");
+    button("Add to the plan").click();
+    check("prep: and stays through other changes to the plan while there is no time", [$("#plan-day").value, keptPlan().dayChosen, cooking()], [day, true, ["Larp Chicken & Sticky Rice", "Pad Thai, Baby"]]);
+    type($("#plan-time"), "19:15");
+    check("prep: a new time typed in keeps the day he set", [$("#plan-day").value, keptPlan().dayChosen, timeline().pop()], [day, true, [dayName(meal) + " at " + clock(meal + 45 * 60000), "Eat"]]);
+    type($("#plan-time"), "");
+    await reload();
+    check("prep: a reload while the box was empty brings back the last real time, with the day he set", [$("#plan-time").value, $("#plan-day").value, keptPlan().dayChosen], ["19:15", day, true]);
+    $("ul.cooking li[data-id=larp-chicken-and-sticky-rice] button.remove").click();
+    pick($("#plan-pick"), "larp-chicken-and-sticky-rice");
+    button("Add to the plan").click();
+    type($("#plan-time"), "18:30");
+    check("prep: back as it was", [cooking(), timeline()], [["Pad Thai, Baby", "Larp Chicken & Sticky Rice"], [start("Larp Chicken & Sticky Rice", 1440), start("Pad Thai, Baby", 60), eat]]);
     const hours = () => $("#hours-larp-chicken-and-sticky-rice"), mins = () => $("#mins-larp-chicken-and-sticky-rice");
     const note = () => text($("ul.cooking li[data-id=larp-chicken-and-sticky-rice] .guess-line .warn"));
     check("prep: a guessed time says so and can be changed for this plan, in hours and minutes",
@@ -354,8 +475,11 @@ try {
     type(hours(), "10");
     check("prep: his time moves the start", timeline(), [start("Larp Chicken & Sticky Rice", 600), start("Pad Thai, Baby", 60), eat]);
     type(hours(), "");
-    check("prep: a time the plan cannot use is said, and the recipe's own is used", [note(), timeline()[0]],
-      ["The plan can't use that (plain numbers, two weeks at most). Using the recipe's 1 day.", start("Larp Chicken & Sticky Rice", 1440)]);
+    // the larp carries the tag, so its own time is said in hours here, never as "1 day" beside "2-day recipe"
+    const larpOwn = "The plan can't use that (plain numbers, two weeks at most). Using the recipe's " + totalText(larp.total_minutes, larp.days) + ".";
+    check("prep: a time the plan cannot use is said, and the recipe's own is used", [note(), timeline()[0], /\d days?\b/.test(note())],
+      [larpOwn, start("Larp Chicken & Sticky Rice", 1440), false]);
+    check("prep: the plan says a tagged recipe's time in hours too", text($$("ol.timeline li .sub")[0]), "Takes " + totalText(larp.total_minutes, larp.days) + ", which is a guess.");
     type(mins(), "999999999999");
     check("prep: a huge number does not break the page", [note().startsWith("The plan can't use that"), timeline(), text($("#app h1")), button("Add to Calendar").closest(".row").hidden],
       [true, [start("Larp Chicken & Sticky Rice", 1440), start("Pad Thai, Baby", 60), eat], "Prep", false]);
@@ -369,8 +493,34 @@ try {
     type(hours(), "");
     type(mins(), "30");
     check("prep: and the order follows the start times", timeline(), [start("Pad Thai, Baby", 60), start("Larp Chicken & Sticky Rice", 30), eat]);
-    check("prep: the calendar and copy buttons; the iPhone one is not shown on a computer",
-      ["Add to Calendar", "Copy plan", "Clear plan"].map((x) => Boolean(button(x)) && !button(x).closest(".row").hidden).concat(Boolean(button("Open in Calendar (iPhone)"))), [true, true, true, false]);
+    typeKeys(hours(), "1e");
+    check("prep: text the browser will not hand over in a time box is said, and is not counted as an empty box",
+      [hours().validity.badInput, hours().value, mins().value, note(), timeline()[0]],
+      [true, "", "30", larpOwn, start("Larp Chicken & Sticky Rice", 1440)]);
+    type(hours(), "");
+    check("prep: with the box cleared the minutes count again", [hours().validity.badInput, note(), timeline()], [false, "", [start("Pad Thai, Baby", 60), start("Larp Chicken & Sticky Rice", 30), eat]]);
+    check("prep: one calendar button, a copy button and a clear button, the same on every device",
+      [$$("#app .right > .row button").map(text), button("Add to Calendar").closest(".row").hidden, $$("#app button").filter((b) => /calendar/i.test(text(b))).length], [["Add to Calendar", "Copy plan", "Clear plan"], false, 1]);
+    button("Add to Calendar").click();
+    const [icsName, ics] = await lastFile();
+    check("prep: Add to Calendar hands over one calendar file with an event for each recipe, in the form every calendar reads",
+      [icsName, ics.startsWith("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"), ics.endsWith("END:VCALENDAR\r\n"), ics.split("BEGIN:VEVENT").length - 1, ics.includes("SUMMARY:Cook: Pad Thai\\, Baby")],
+      ["Meal plan " + day + ".ics", true, true, 2, true]);
+    // Opening the file is the wrong first step on most calendars (Google Calendar only imports on a computer,
+    // Outlook wants Upload from file), so the words say to import it and the note says where.
+    check("prep: and says what to do with it, which is to import it, and points at the note that says how",
+      [text($("#app .right > .status")), Boolean($("#app .right > .status").compareDocumentPosition($(".plan-note")) & 4)],
+      ["Downloaded the calendar file. Import it into your calendar to add the events. The note below says how.", true]);
+    const notes = $$(".plan-note p").map(text);
+    check("prep: the note under the plan says what the button gives", notes[0], "The plan is kept on this device until you clear it. Add to Calendar downloads one calendar file (.ics) with an event for each recipe.");
+    check("prep: and how the file gets into a calendar: where importing lives in the two most used, which add it when it is opened, that the alert may not come with it, and Copy plan for any that will not take it",
+      notes[1], "To add it, import the file into your calendar on a computer: in Google Calendar, Settings, then Import & export; in Outlook, Add calendar, then Upload from file."
+        + " Apple Calendar and some phone calendars add the events when you open the file."
+        + " Some calendars, Google Calendar among them, may drop the alert picked here and use their own, so check an event after you import it."
+        + " If yours will not take the file, Copy plan gives you the same plan as text to paste anywhere.");
+    check("prep: the note never tells anyone to open the file as the way in, and Copy plan, which it names, is on the page",
+      [/\bopen it\b/i.test(notes.join(" ") + text($("#app .right > .status"))), notes.length, Boolean(button("Copy plan"))], [false, 2, true]);
+    check("prep: nothing on the page opens a file through an address of its own", [linksOut(), win().location.href.startsWith("http")], [[], true]);
     pick($("#plan-alert"), "30");
     await reload();
     check("prep: the plan is kept on the device, and so is the day he set", [cooking(), timeline(), $("#plan-day").value, $("#plan-time").value, $("#plan-alert").value],
@@ -389,6 +539,24 @@ try {
     button("Yes, clear it").click();
     check("prep: until he clears it", [cooking(), text($(".empty")).startsWith("Nothing picked yet."), text($("#app .status")), $("#plan-day").value],
       [[], true, "The plan is cleared.", defaultDay(Date.now(), "18:30", 0)]);
+    // Cleared while the Eat at box is empty: the plan then holds no day, and the Day box must not go on showing one
+    pick($("#plan-pick"), "pad-thai-baby");
+    button("Add to the plan").click();
+    type($("#plan-day"), day);
+    type($("#plan-time"), "");
+    check("prep: (a day set and the Eat at box emptied, before the plan is cleared)", [$("#plan-day").value, keptPlan().date, keptPlan().dayChosen], [day, day, true]);
+    button("Clear plan").click();
+    button("Yes, clear it").click();
+    check("prep: cleared while the Eat at box was empty, the Day box shows what the plan holds, which is no day",
+      [$("#plan-day").value, [keptPlan().date, keptPlan().dayChosen, keptPlan().time], cooking()], ["", ["", false, ""], []]);
+    pick($("#plan-pick"), "pad-thai-baby");
+    button("Add to the plan").click();
+    check("prep: a recipe added then is asked for a day and a time, beside two empty boxes", [text($(".plan-out")), $("#plan-day").value, $("#plan-time").value], ["Pick a day and a time.", "", ""]);
+    type($("#plan-time"), "18:30");
+    check("prep: and a time typed in gives the first day that works, as on a first visit",
+      [$("#plan-day").value, keptPlan().dayChosen, timeline().length], [defaultDay(Date.now(), "18:30", padThai.total_minutes), false, 2]);
+    button("Clear plan").click();
+    button("Yes, clear it").click();
   });
 
   let toastHash = "";
@@ -398,6 +566,8 @@ try {
     check("draft: says honestly that saving to the site is not built, and where the file goes",
       [text($(".finish h2")), text($(".finish")).includes("Saving straight to the site isn't built yet."), text($(".finish")).includes("It goes in the recipes folder.")], ["Recipe file", true, true]);
     check("draft: the form says the total time is required", text($("fieldset.time legend")), "Total time, start to finish (every recipe needs one)");
+    check("draft: that some browsers clear what is kept is said to everyone, as a fact, with the one thing that always works",
+      text($(".lapse")), "Some browsers clear what a site keeps on a device after a week or so without a visit. To keep a draft for good, download its recipe file.");
     type($("#f-title"), "x");
     await until("the draft's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
     type($("#f-title"), "");
@@ -416,6 +586,9 @@ try {
     check("draft: the preview shows the recipe as its page will look, with the page's own step numbers only",
       [text($(".preview .recipe-title")), $$(".preview ul.ing li").map(text), text($(".preview h4")), $$(".preview ol.steps li").map(text), text($(".preview .meta span"))],
       ["Test Toast", ["2 slices bread", "butter, to taste", "a toaster the size of a car"], "Preparation", ["Toast the bread.", "Butter it."], "No total time yet."]);
+    type($("#f-tips"), "1. Eat it hot.\n2) Don't burn it.\n2 slices is plenty");
+    check("draft: tips pasted with numbers lose them too, and a tip that starts with an amount keeps it", $$(".preview ul.tips li").map(text), ["Eat it hot.", "Don't burn it.", "2 slices is plenty"]);
+    type($("#f-tips"), "");
     check("draft: one top heading on the page; the preview sits a level down", [$$("h1").map(text), $(".preview .recipe-title").tagName, $$(".preview h3").map(text)],
       [["Draft a recipe"], "H2", ["Ingredients", "Steps"]]);
     check("draft: the preview's tick boxes are pictures, not places Tab stops", [$$(".preview input").length, $$(".preview .box").length], [0, 2]);
@@ -446,9 +619,18 @@ try {
     type($("#f-hours"), "-2");
     check("draft: a time box that is not a plain number is said, and no file is made from it", [text($("#takes")), text($(".needed")), $("#recipe-file").value],
       ["The time boxes take numbers only, like 1 hour 30 minutes.", "No recipe file yet. The time boxes take numbers only, like 1 hour 30 minutes.", ""]);
+    typeKeys($("#f-hours"), "1e");
+    check("draft: text the browser will not hand over in a time box is said the same way, and is not counted as an empty box beside the 30 minutes",
+      [$("#f-hours").validity.badInput, $("#f-hours").value, $("#f-minutes").value, text($("#takes")), text($(".needed")), $("#recipe-file").value],
+      [true, "", "30", "The time boxes take numbers only, like 1 hour 30 minutes.", "No recipe file yet. The time boxes take numbers only, like 1 hour 30 minutes.", ""]);
+    button("Copy recipe file").click();
+    check("draft: and no file is handed over while it is there", text($(".finish .status")), "No recipe file yet. The time boxes take numbers only, like 1 hour 30 minutes.");
+    typeKeys($("#f-hours"), "--");
+    check("draft: two minus signs the same", [$("#f-hours").validity.badInput, text($("#takes"))], [true, "The time boxes take numbers only, like 1 hour 30 minutes."]);
     type($("#f-hours"), "50");
     type($("#f-minutes"), "");
-    check("draft: a day or more under hours is questioned", text($("#takes")), "Takes 2 days 2 hours, start to finish. That is a day or more. If you meant minutes, move the number to the minutes box.");
+    check("draft: a day or more under hours is questioned, and with the days control moved to 3 days the time is said in hours", [text($("#takes")), $("#f-days").value],
+      ["Takes 50 hours, start to finish. That is a day or more. If you meant minutes, move the number to the minutes box.", "3"]);
     type($("#f-hours"), "");
     type($("#f-minutes"), "50");
     check("draft: the live line", text($("#takes")), "Takes 50 minutes, start to finish.");
@@ -466,7 +648,9 @@ try {
       [{ section: "Preparation", items: ["Toast the bread.", "Butter it."] }], "<img src=x> & toast", true, true]);
     check("draft: the preview follows", [text($(".preview .kicker")), text($(".preview .meta span"))], ["Snacks", "Ready in 50 minutes."]);
     button("Download recipe file").click();
-    check("draft: the file is handed over once nothing is missing", text($(".finish .status")), "Downloaded test-toast.json. Look in Downloads.");
+    const [fileName, fileWords] = await lastFile();
+    check("draft: the file is handed over once nothing is missing", [text($(".finish .status")), fileName, JSON.parse(fileWords).title, JSON.parse(fileWords).total_minutes, fileWords.endsWith("}\n")],
+      ["Downloaded test-toast.json. Look in Downloads.", "test-toast.json", "Test Toast", 50, true]);
     audit("draft form");
     await go("#/", "home");
     check("home: the draft count", doorCounts().Draft, "1 draft");
@@ -482,6 +666,39 @@ try {
     check("draft: the copy note says what happens to the recipe", text($(".note p")), "This is a copy of " + rolls.title + ". Added to the site, it replaces " + rolls.title + ". Tick the box to keep both.");
     await go("#/", "home");
     check("home: a copy with nothing changed is not a draft yet", doorCounts().Draft, "1 draft");
+    await go("#/draft?copy=spring-rolls", "draft");
+    const keptDrafts = () => JSON.parse(localStorage.getItem("grub.drafts")).data.map((x) => x.fields.title);
+    type($("#f-title"), rolls.title + "!");
+    await until("the copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+    const shortLived = win().location.hash;
+    check("draft: a changed copy is kept as a draft", keptDrafts(), [rolls.title + "!", "Test Toast"]);
+    type($("#f-title"), rolls.title);
+    check("draft: changed back to read exactly as the recipe does, it is not kept, and its address is the copy's again",
+      [keptDrafts(), win().location.hash, app().dataset.hash, JSON.stringify(JSON.parse($("#recipe-file").value)) === JSON.stringify(clean(rolls))],
+      [["Test Toast"], "#/draft?copy=spring-rolls", "#/draft?copy=spring-rolls", true]);
+    $("#f-separate").click();
+    await until("the separate copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+    check("draft: an unchanged copy marked as a separate recipe is kept", keptDrafts(), [rolls.title, "Test Toast"]);
+    $("#f-separate").click();
+    check("draft: and not kept once the mark is taken off again", [keptDrafts(), win().location.hash], [["Test Toast"], "#/draft?copy=spring-rolls"]);
+    await go("#/", "home");
+    check("home: a copy changed and changed back is not counted", doorCounts().Draft, "1 draft");
+    await go(shortLived, "draft");
+    check("draft: the address it had for a moment says it is gone", text($("#app p")), "That draft isn't on this device.");
+    // a copy he kept before this was put right, and one of a version the site no longer has
+    const older = { ...rolls, version: rolls.version + 5 };
+    store("drafts", [draftFromRecipe(rolls, "dsame1", 5), draftFromRecipe(older, "dolder1", 6), ...JSON.parse(localStorage.getItem("grub.drafts")).data]);
+    win().location.hash = "#/draft/dsame1";
+    await until("the unchanged copy opened as a new copy", () => app().dataset.hash === "#/draft?copy=spring-rolls" && $("#f-title"));
+    check("draft: an unchanged copy kept by an earlier visit is let go when it is opened", [keptDrafts(), $("#f-title").value], [["Test Toast", rolls.title], rolls.title]);
+    await go("#/draft/dolder1", "draft");
+    type($("#f-title"), rolls.title + "?");
+    type($("#f-title"), rolls.title);
+    check("draft: an unchanged copy of a version the site no longer has is kept, because it may be the only one", [keptDrafts(), win().location.hash], [[rolls.title, "Test Toast"], "#/draft/dolder1"]);
+    button("Delete this draft").click();
+    button("Yes, delete it").click();
+    await until("the list of drafts", () => app().dataset.hash === "#/draft" && $(".drafts"));
+    check("draft: and can still be deleted by hand", keptDrafts(), ["Test Toast"]);
     await go("#/draft?copy=spring-rolls", "draft");
     type($("#f-title"), rolls.title + " II");
     await until("the copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
@@ -511,6 +728,272 @@ try {
     check("draft: a deleted draft's address says so", text($("#app p")), "That draft isn't on this device.");
     await go("#/draft?copy=no-such-recipe", "draft");
     check("draft: a copy of a recipe that is not here says so", text($("#app p")), "That recipe is not here.");
+  });
+
+  await flow("two-day recipes", async () => {
+    // A recipe that cannot be made in one day says so wherever its time is shown, can be found by that, and
+    // the form can say it. The larp stands for the tagged recipes and the first recipe without the tag for the
+    // same-day ones. Nothing here counts on how many recipes there are, on which others carry the tag, or on
+    // his own words for a time: what a page should say is worked out from the data file.
+    const TAG = daysLabel(larp);
+    const tagged = data.recipes.filter((r) => daysLabel(r)), sameDay = data.recipes.find((r) => !daysLabel(r));
+    const rowOf = (title) => $$("ul.rows li").find((li) => text(li.querySelector(".t")) === title);
+    const tagOf = (title) => (rowOf(title) && rowOf(title).querySelector(".days") ? text(rowOf(title).querySelector(".days")) : null);
+    const stopped = (m) => m + (/[.!?]$/.test(m) ? "" : ".");
+    const metaWords = (r) => [timeFacts(r).ready].concat(daysLabel(r) || [], r.yield ? (/^(serves|makes)/i.test(r.yield) ? r.yield : "Serves " + r.yield) : [], r.source ? "Credit: " + r.source : [])
+      .map(stopped).join(" ");
+    check("days: the larp carries the tag, the tag says its number of days, and there is a same-day recipe to hold it against",
+      [TAG, larp.days > 1, Boolean(sameDay)], [larp.days + "-day recipe", true, true]);
+
+    await go("#/browse", "browse");
+    check("days: in Browse every tagged recipe's row carries its tag beside its time, with the time counted in hours, and a same-day recipe's row has none",
+      [text(rowOf(larp.title).querySelector(".m")), /\d days?\b/.test(text(rowOf(larp.title).querySelector(".time"))), tagOf(sameDay.title), text(rowOf(sameDay.title).querySelector(".m")), $$("ul.rows .days").map(text)],
+      [shortTime(larp) + ", " + TAG, false, null, shortTime(sameDay), tagged.map((r) => daysLabel(r))]);
+    // The times are one column: a row's tag sits to the left of its time, so the time ends where every other
+    // row's time ends, and a tagged row is no taller than the one above it. In a narrower window, where the
+    // tag has no room beside the time, it goes under the time and ends at the same edge.
+    const edge = (r) => Math.round(rowOf(r.title).querySelector(".time").getBoundingClientRect().right * 2) / 2;
+    const tall = (r) => Math.round(rowOf(r.title).getBoundingClientRect().height * 2) / 2;
+    const rect = (sel) => rowOf(larp.title).querySelector(sel).getBoundingClientRect();
+    const oneLine = data.recipes.filter((r) => rowOf(r.title).querySelector(".t").getBoundingClientRect().height < 30);
+    check("days: in a computer window every row's time ends at the same right edge, the tag is to the left of its time on the same line, and the tagged row is as tall as the others",
+      [[...new Set(data.recipes.map(edge))].length, rect(".days").right <= rect(".time").left - 6, Math.abs(rect(".days").top - rect(".time").top) < 6, [...new Set(oneLine.map(tall))].length, oneLine.includes(larp)],
+      [1, true, true, 1, true]);
+    frame.setAttribute("width", "900");
+    await settled(() => win().innerWidth === 900);
+    const beside = rect(".days").right <= rect(".time").left - 6 && Math.abs(rect(".days").top - rect(".time").top) < 6;
+    const under = rect(".days").top >= rect(".time").bottom - 0.5 && Math.abs(rect(".days").right - rect(".time").right) < 0.75;
+    check("days: in a narrow two-column window the times still end at one right edge, with the tag to the left of its time or under it and flush with it",
+      [[...new Set(data.recipes.map(edge))].length, beside || under, sideways()], [1, true, 0]);
+    frame.setAttribute("width", "1280");
+    await settled(() => win().innerWidth === 1280);
+    check("days: the tag is the page's own type in a thin outline: no fill, no capitals, no letter-spacing, not monospaced, never split over two lines", (() => {
+      const s = win().getComputedStyle(rowOf(larp.title).querySelector(".days"));
+      return [s.backgroundColor, s.textTransform, s.letterSpacing, /mono|courier/i.test(s.fontFamily), s.borderTopStyle, s.borderTopWidth, s.whiteSpace];
+    })(), ["rgba(0, 0, 0, 0)", "none", "normal", false, "solid", "1px", "nowrap"]);
+    const timeNames = () => $$(".filter[aria-label=Time] button").map(text);
+    check("days: the Time choices end with the new one, after the ones that were there", timeNames(), ["Any", "30 minutes or less", "An hour or less", "Two days or more"]);
+    button("Two days or more").click();
+    const twoOrMore = narrow(data.recipes, { minDays: 2 }).map((r) => r.title);
+    check("days: Two days or more lists the tagged recipes, the larp among them, and the address keeps the choice",
+      [rowTitles(), rowTitles().includes(larp.title), tagOf(larp.title), win().location.hash, button("Two days or more").getAttribute("aria-pressed"), button("Any").getAttribute("aria-pressed"), text($(".count"))],
+      [twoOrMore, true, TAG, "#/browse?time=days", "true", "false", twoOrMore.length + (twoOrMore.length === 1 ? " recipe" : " recipes") + " of " + data.recipes.length]);
+    await reload();
+    check("days: a reload comes back to the same list", [rowTitles(), button("Two days or more").getAttribute("aria-pressed")], [twoOrMore, "true"]);
+    button("An hour or less").click();
+    check("days: one Time choice at a time, and An hour or less never lists a tagged recipe",
+      [button("Two days or more").getAttribute("aria-pressed"), rowTitles().includes(larp.title), $$("ul.rows .days").length, rowTitles().length > 0, win().location.hash], ["false", false, 0, true, "#/browse?time=60"]);
+    button("30 minutes or less").click();
+    check("days: nor does 30 minutes or less", [rowTitles().includes(larp.title), $$("ul.rows .days").length], [false, 0]);
+    button("Two days or more").click();
+    button("Two days or more").click();
+    check("days: pressed again, the choice is off and the address is plain", [rowTitles().length, win().location.hash, button("Any").getAttribute("aria-pressed")], [data.recipes.length, "#/browse", "true"]);
+    const found = {}, wanted = {};
+    const number = ["", "", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen"][larp.days];
+    for (const typed of [larp.days + " day", larp.days + "-day", number + " day", TAG, TAG + "s"]) {
+      type($("#search"), typed);
+      found[typed] = [rowTitles().includes(larp.title), rowTitles()];
+      wanted[typed] = [true, narrow(data.recipes, { query: typed }).map((r) => r.title)];
+    }
+    check("days: typing the tag's words in the search finds it, with or without the word recipe or recipes after them", found, wanted);
+    type($("#search"), TAG);
+    check("days: and the tag shows in the search results", [tagOf(larp.title), win().location.hash], [TAG, "#/browse?q=" + encodeURIComponent(TAG).replace(/%20/g, "+")]);
+    type($("#search"), (larp.days + 1) + " day");
+    check("days: another number of days does not find it", rowTitles().includes(larp.title), false);
+    type($("#search"), "");
+    audit("browse with a tagged recipe");
+
+    await go("#/r/larp-chicken-and-sticky-rice", "recipe");
+    const meta = () => $(".recipe-head .meta");
+    const box = (el) => el.getBoundingClientRect();
+    const tagIn = (el) => el.querySelector(".days");
+    check("days: the recipe page says it right after the time", [text(meta()), text(tagIn(meta())), tagIn(meta()).previousElementSibling.previousElementSibling === meta().querySelector("span")],
+      [metaWords(larp), TAG, true]);
+    // The tag is an outlined word between two sentences. A plain word space on each side left it jammed against
+    // them, so each side has a wider space, the same on both sides, and still a space (it can end a line).
+    const before = tagIn(meta()).previousElementSibling, after = tagIn(meta()).nextElementSibling.nextElementSibling;
+    const wordSpace = (() => { const s = doc().createElement("span"); s.textContent = "a a"; const one = doc().createElement("span"); one.textContent = "aa"; meta().append(s, one); const w = box(s).width - box(one).width; s.remove(); one.remove(); return w; })();
+    check("days: on the recipe page the tag has clear room on both sides, more than a word space and the same each side",
+      [[before.className, after.className, before.textContent, after.textContent], Math.round(box(tagIn(meta())).left - box(before.previousElementSibling).right) >= Math.round(wordSpace) + 5,
+        after.nextElementSibling ? Math.round(box(after.nextElementSibling).left - box(tagIn(meta())).right) >= Math.round(wordSpace) + 5 : true, Math.round(box(tagIn(meta())).left - box(before.previousElementSibling).right) <= 16],
+      [["tag-gap", "tag-gap", " ", " "], true, true, true]);
+    const pdfLink = $$(".actions a").find((a) => text(a) === "Tablet PDF").getAttribute("href");
+    const olderPdfs = [];
+    for (let v = 1; v < larp.version; v += 1) if ((await fetch("../pdf/" + larp.id + "-v" + v + ".pdf", { method: "HEAD" })).ok) olderPdfs.push(v);
+    check("days: its Tablet PDF link is the file of the version the site has now, that file is there, and no file of an earlier version is left beside it",
+      [pdfLink, (await fetch("../" + pdfLink, { method: "HEAD" })).ok, olderPdfs], ["pdf/" + larp.id + "-v" + larp.version + ".pdf", true, []]);
+    $(".actions button.star").click();
+    await go("#/r/" + sameDay.id, "recipe");
+    check("days: a same-day recipe's page has no tag", [$("#app .days"), $("#app .tag-gap"), text(meta())], [null, null, metaWords(sameDay)]);
+    await go("#/saved", "saved");
+    check("days: Saved shows it in the row too, after the chapter and the time", [text(rowOf(larp.title).querySelector(".m")), $$("ul.rows .days").length], [chapterOf(larp) + ", " + shortTime(larp) + ", " + TAG, 1]);
+    rowOf(larp.title).querySelector("button.star").click();
+
+    await go("#/r/larp-chicken-and-sticky-rice", "recipe");
+    button("Plan a meal").click();
+    await until("the prep page", () => app().dataset.page === "prep");
+    pick($("#plan-pick"), sameDay.id);
+    button("Add to the plan").click();
+    const cookLine = (id) => $("ul.cooking li[data-id=" + id + "] .cook-line");
+    const larpLine = cookLine("larp-chicken-and-sticky-rice");
+    check("days: Prep says it on the recipe's own line under What you're cooking, right after its name, and not on a same-day recipe's",
+      [$$("ul.cooking li .t").map(text), text(larpLine.querySelector(".days")), larpLine.querySelector(".days").previousElementSibling === larpLine.querySelector("a.t"), cookLine(sameDay.id).querySelector(".days"),
+        Boolean(larpLine.querySelector(".remove"))],
+      [[larp.title, sameDay.title], TAG, true, null, true]);
+    audit("prep with a tagged recipe");
+    button("Clear plan").click();
+    button("Yes, clear it").click();
+
+    await go("#/draft", "draft");
+    const daysBox = () => $("#f-days"), daysSaid = () => text($("#days-note")), needed = () => text($(".needed"));
+    const file = () => JSON.parse($("#recipe-file").value);
+    check("days: the form has one small labelled control under the total time, from the same day up to 14 days",
+      [text($("label[for=f-days] > span")), daysBox().tagName, $$("#f-days option").map(text), daysBox().value,
+        Boolean($("fieldset.time").compareDocumentPosition(daysBox()) & 4), Boolean(daysBox().compareDocumentPosition($("#f-time-text")) & 4)],
+      ["Days it needs", "SELECT", ["Same day"].concat(Array.from({ length: 13 }, (_, n) => (n + 2) + " days")), "", true, true]);
+    check("days: the line that says why it moved is a status line, in the page while it is empty, taking no room",
+      [$("#days-note").getAttribute("role"), daysSaid(), win().getComputedStyle($("#days-note")).display === "none", $("#days-note").getBoundingClientRect().height], ["status", "", false, 0]);
+    type($("#f-title"), "Soaked Beans");
+    await until("the draft's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+    const beansHash = win().location.hash;
+    type($("#f-ingredients"), "1 lb beans");
+    type($("#f-steps"), "Soak the beans overnight.\nCook them.");
+    type($("#f-hours"), "14");
+    check("days: under 24 hours the control is left alone, and the file has no days", [daysBox().value, daysSaid(), "days" in file(), $(".preview .days")], ["", "", false, null]);
+    pick(daysBox(), "2");
+    check("days: picking 2 days puts the field in the recipe file, after the total time, and the tag in the preview",
+      [file().days, Object.keys(file()).join(" "), text($(".preview .meta .days")), text($(".preview .meta")), needed()],
+      [2, "schema id version created updated title total_minutes days tags ingredients steps", "2-day recipe", "Ready in 14 hours. 2-day recipe.", "Nothing is missing. The recipe file is ready."]);
+    await reload();
+    check("days: kept with the draft across a reload", [win().location.hash, daysBox().value, file().days], [beansHash, "2", 2]);
+    pick(daysBox(), "");
+    check("days: set back to Same day, the field leaves the file and the tag leaves the preview", ["days" in file(), $(".preview .days")], [false, null]);
+    type($("#f-hours"), "24");
+    check("days: at 24 hours the control moves to 2 days by itself, and a line says why",
+      [daysBox().value, daysSaid(), file().days, needed()], ["2", "The total time is 24 hours or more, so this is set to 2 days.", 2, "Nothing is missing. The recipe file is ready."]);
+    type($("#f-hours"), "50");
+    check("days: and on to 3 days at 48 hours or more", [daysBox().value, daysSaid(), file().days], ["3", "The total time is 48 hours or more, so this is set to 3 days.", 3]);
+    // A slip while typing must not move the control: "24e" is no number, so the page says it cannot read the
+    // time and leaves the days alone, in place of taking them back to Same day as if the time were gone.
+    pick(daysBox(), "");
+    type($("#f-hours"), "24");
+    const quietNote = styleOf($("#days-note")).color, plainEdge = styleOf($("#f-title")).borderTopColor;
+    typeKeys($("#f-hours"), "24e");
+    check("days: a slip while typing the hours (24e) leaves the days where they were, and the page says it cannot read the time",
+      [$("#f-hours").validity.badInput, daysBox().value, daysSaid(), text($("#takes")), $("#takes").classList.contains("warn")],
+      [true, "2", "The total time is 24 hours or more, so this is set to 2 days.", "The time boxes take numbers only, like 1 hour 30 minutes.", true]);
+    typeKeys($("#f-hours"), "50");
+    check("days: and with the slip put right the control moves on as it would have", [daysBox().value, daysSaid(), $("#takes").classList.contains("warn")],
+      ["3", "The total time is 48 hours or more, so this is set to 3 days.", false]);
+    check("days: a line that only says why the control moved is quiet, and the control is not marked as wrong",
+      [$("#days-note").classList.contains("warn"), daysBox().hasAttribute("aria-invalid"), styleOf($("#days-note")).color === quietNote, styleOf(daysBox()).borderTopColor === plainEdge], [false, false, true, true]);
+    pick(daysBox(), "2");
+    const tooFew = "The total time is 48 hours or more, so this recipe needs at least 3 days. Under Days it needs, pick 3 days or more.";
+    check("days: choosing fewer days than the time allows is refused in plain words that name the recipe and the control, where the other problems show and beside the control, and no file is made",
+      [daysBox().value, needed(), daysSaid(), $("#recipe-file").value], ["2", "No recipe file yet. " + tooFew, tooFew, ""]);
+    check("days: a refusal does not look like the quiet note: the line is in the warning colour, the control is marked as wrong and edged in the same colour, and the colour can be read on the page",
+      [$("#days-note").classList.contains("warn"), daysBox().getAttribute("aria-invalid"), styleOf($("#days-note")).color === quietNote, styleOf(daysBox()).borderTopColor === styleOf($("#days-note")).color,
+        styleOf(daysBox()).borderTopColor === plainEdge, contrast(styleOf($("#days-note")).color, pageColour()) >= 4.5, $("#days-note").getAttribute("role")],
+      [true, "true", false, true, false, true, "status"]);
+    button("Copy recipe file").click();
+    check("days: and Copy recipe file says the same and hands nothing over", text($(".finish .status")), "No recipe file yet. " + tooFew);
+    pick(daysBox(), "5");
+    check("days: more days than the least is the writer's call, and the warning look is gone with the refusal",
+      [needed(), file().days, daysSaid(), $("#days-note").classList.contains("warn"), daysBox().hasAttribute("aria-invalid"), styleOf(daysBox()).borderTopColor === plainEdge],
+      ["Nothing is missing. The recipe file is ready.", 5, "", false, false, true]);
+    type($("#f-hours"), "24");
+    check("days: a number he picked himself is not moved down for him", [daysBox().value, daysSaid(), file().days], ["5", "", 5]);
+    pick(daysBox(), "");
+    check("days: Same day picked for a day-long recipe is refused the same way", [daysBox().value, needed(), $("#recipe-file").value],
+      ["", "No recipe file yet. The total time is 24 hours or more, so this recipe needs at least 2 days. Under Days it needs, pick 2 days or more.", ""]);
+    type($("#f-hours"), "30");
+    check("days: and the next time the total time is typed the control moves by itself again", [daysBox().value, daysSaid(), file().days],
+      ["2", "The total time is 24 hours or more, so this is set to 2 days.", 2]);
+    type($("#f-hours"), "");
+    check("days: when the time that moved it is taken away, the control goes back to where it was, and says so", [daysBox().value, daysSaid()],
+      ["", "The total time is under 24 hours now, so this is back to Same day."]);
+    type($("#f-minutes"), "30");
+    check("days: so 30 typed under hours by mistake and moved to minutes leaves no tag behind", [daysBox().value, daysSaid(), "days" in file(), file().total_minutes], ["", "", false, 30]);
+    type($("#f-hours"), "24");
+    $$("button.chip").find((b) => b.dataset.minutes === "60").click();
+    check("days: a one-tap time takes it back the same way", [daysBox().value, daysSaid(), "days" in file(), file().total_minutes], ["", "The total time is under 24 hours now, so this is back to Same day.", false, 60]);
+    audit("draft form with the days control");
+    button("Delete this draft").click();
+    button("Yes, delete it").click();
+    await until("the list of drafts", () => app().dataset.hash === "#/draft" && $(".drafts"));
+    check("days: the draft made for these checks is gone again", $$(".drafts .row-link .t").map(text).includes("Soaked Beans"), false);
+
+    await go("#/draft?copy=larp-chicken-and-sticky-rice", "draft");
+    const otherDays = larp.days < 14 ? larp.days + 1 : larp.days - 1;
+    check("days: a recipe opened as a draft brings its days back, and left alone it is the same recipe file",
+      [daysBox().value, daysSaid(), JSON.stringify(file()) === JSON.stringify(clean(larp)), text($(".preview .meta .days")), win().location.hash], [String(larp.days), "", true, TAG, "#/draft?copy=larp-chicken-and-sticky-rice"]);
+    pick(daysBox(), String(otherDays));
+    await until("the copy's own address", () => /^#\/draft\/[a-z0-9]+$/.test(win().location.hash));
+    check("days: changing only the days makes it a changed copy, the next version", [file().days, file().version, text($(".preview .meta .days"))], [otherDays, larp.version + 1, otherDays + "-day recipe"]);
+    pick(daysBox(), String(larp.days));
+    check("days: and changed back, it is not kept", [win().location.hash, JSON.stringify(file()) === JSON.stringify(clean(larp))], ["#/draft?copy=larp-chicken-and-sticky-rice", true]);
+
+    // A copy kept on this device from before the recipe changed on the site: here the larp as it was one version
+    // back, before it had its days. Nothing in it is his own, so it must not come back as the recipe: opened,
+    // it is let go and a copy of the recipe as it is now opens, with the tag.
+    const earlier = { ...clean(larp), version: larp.version - 1, updated: larp.created };
+    delete earlier.days;
+    const keptNow = () => { const s = localStorage.getItem("grub.drafts"); return s ? JSON.parse(s).data : []; };
+    const keptIds = () => keptNow().map((x) => x.id);
+    store("drafts", [draftFromRecipe(earlier, "dstale1", 7), draftFromRecipe(earlier, "dstale2", 8), ...keptNow()]);
+    await go("#/draft", "draft");
+    check("days: (two copies of the larp as it was one version back are kept, as an earlier visit would have left them)",
+      [keptIds().filter((id) => id.startsWith("dstale")), $$(".drafts .row-link .t").map(text).filter((t) => t === larp.title).length], [["dstale1", "dstale2"], 2]);
+    win().location.hash = "#/draft/dstale1";
+    await until("the stale copy opened as a copy of the recipe as it is now", () => app().dataset.hash === "#/draft?copy=larp-chicken-and-sticky-rice" && $("#f-title"));
+    check("days: an unchanged copy from before the recipe changed is let go when it is opened by its own address, and the recipe as the site has it now opens in its place",
+      [keptIds().includes("dstale1"), daysBox().value, text($(".preview .meta .days")), JSON.stringify(file()) === JSON.stringify(clean(larp)), file().version],
+      [false, String(larp.days), TAG, true, larp.version]);
+    await go("#/r/larp-chicken-and-sticky-rice", "recipe");
+    button("Edit a copy as a draft").click();
+    await until("the copy of the recipe as it is now", () => app().dataset.hash === "#/draft?copy=larp-chicken-and-sticky-rice" && $("#f-title"));
+    check("days: and Edit a copy as a draft lets the other stale copy go the same way, in place of carrying on with the older words",
+      [keptIds().includes("dstale2"), win().location.hash, daysBox().value, JSON.stringify(file()) === JSON.stringify(clean(larp))], [false, "#/draft?copy=larp-chicken-and-sticky-rice", String(larp.days), true]);
+    // The same older copy with something of his own in it is his to keep. Its file must not go out under a
+    // version number the site already has: it is numbered one past the later of the two.
+    const mine = draftFromRecipe(earlier, "dstale3", 9);
+    mine.fields.title = larp.title + " II";
+    store("drafts", [mine, ...keptNow()]);
+    await go("#/draft/dstale3", "draft");
+    check("days: a changed copy from before the recipe changed is kept as it is, with the days it had then, and the form asks for the days the time needs before it makes a file",
+      [keptIds().includes("dstale3"), $("#f-title").value, daysBox().value, needed(), $("#recipe-file").value],
+      [true, larp.title + " II", "", "No recipe file yet. The total time is 24 hours or more, so this recipe needs at least 2 days. Under Days it needs, pick 2 days or more.", ""]);
+    pick(daysBox(), String(larp.days));
+    check("days: its file is one version past the site's, never the number the site already has",
+      [file().id, file().version, file().title, file().days], [larp.id, larp.version + 1, larp.title + " II", larp.days]);
+    check("days: and the note with the file says which version the copy was made from and which the site has now",
+      text($("details.help p")), "This is " + larp.id + ".json, version " + (larp.version + 1) + ". It is a changed copy of " + larp.title + " as it was at version " + (larp.version - 1)
+        + ". The site has a later version now, version " + larp.version + ", and this file replaces that one.");
+    type($("#f-title"), larp.title);
+    pick(daysBox(), "");
+    check("days: changed back to the older words, the older copy is still kept (it is not what the site has), and the note says so",
+      [keptIds().includes("dstale3"), win().location.hash, text($("details.help p"))],
+      [true, "#/draft/dstale3", "The file shows up here once nothing is missing."]);
+    button("Delete this draft").click();
+    button("Yes, delete it").click();
+    await until("the list of drafts", () => app().dataset.hash === "#/draft");
+    check("days: the copies made for these checks are gone again", keptIds().filter((id) => id.startsWith("dstale")), []);
+
+    // The narrowest window with the list beside the choices, where a row has the least room. The larp's row is
+    // given the longest words a row can hold (as text), so the site's own styles do the wrapping: the title
+    // keeps half the row, and the tag goes under the time before the title is squeezed into a sliver.
+    frame.setAttribute("width", "900");
+    await go("#/browse", "browse");
+    const tight = rowOf(larp.title), part = (sel) => tight.querySelector(sel);
+    const asItIs = [Math.abs(box(part(".time")).right - box(part(".m")).right) < 0.75, box(part(".t")).right <= box(part(".m")).left, box(part(".m")).right <= box(part(".row-link")).right + 0.5];
+    part(".t").textContent = "Grandmother's Slow Fermented Cabbage with Chili, Garlic and a Great Deal of Patience";
+    part(".time").textContent = "about 13 days 23 hours 59 minutes";
+    part(".days").textContent = "14-day recipe";
+    check("days: in a narrow two-column window the time ends at the right edge of the row, and with a long title and the longest time the title keeps half the row and the tag goes under the time, whole",
+      [asItIs, sideways(), box(part(".t")).width >= box(part(".row-link")).width / 2 - 1, box(part(".t")).right <= box(part(".m")).left, box(part(".m")).right <= box(part(".row-link")).right + 0.5,
+        box(part(".days")).top >= box(part(".time")).bottom - 0.5, box(part(".days")).height < 30, box(part(".days")).right <= box(part(".m")).right + 0.5],
+      [[true, true, true], 0, true, true, true, true, true, true]);
+    frame.setAttribute("width", "1280");
   });
 
   await flow("long words", async () => {
@@ -597,7 +1080,7 @@ try {
       await go("#/saved", "saved");
       check("not kept: Saved says so", text($(".count")), "1 recipe. " + NOT_KEPT);
       await go("#/draft", "draft");
-      check("not kept: Draft says so", [text($(".lede")).endsWith(NOT_KEPT), text($(".lede")).includes("saves itself")], [true, false]);
+      check("not kept: Draft says so, and does not go on about what browsers clear later", [text($(".lede")).endsWith(NOT_KEPT), text($(".lede")).includes("saves itself"), $(".lapse")], [true, false, null]);
       await go("#/prep", "prep");
       check("not kept: Prep says so", [text($(".plan-note")).startsWith(NOT_KEPT), text($(".plan-note")).includes("kept on this device")], [true, false]);
     } finally { proto.setItem = realSet; }
@@ -624,20 +1107,78 @@ try {
     await go("#/shopping", "shopping");
     type($("#own-item"), link);
     $("form.add-own").requestSubmit();
-    check("phone: Send to Reminders is above the list", $("a.btn.primary").getBoundingClientRect().bottom <= $("ul.shop").getBoundingClientRect().top, true);
+    const copyBox = button("Copy list").getBoundingClientRect(), clears = [button("Clear ticked"), button("Clear all")].map((b) => b.getBoundingClientRect());
+    check("phone: Copy list is above the list, as wide as the page, with the two clear buttons side by side under it",
+      [copyBox.bottom <= $("ul.shop").getBoundingClientRect().top, Math.round(copyBox.width), clears[0].top === clears[1].top && clears[0].top > copyBox.bottom, Math.round(clears[1].right - clears[0].left)],
+      [true, 390 - 32, true, 390 - 32]);
+    // Where the browser will not copy, the list goes into a box to copy by hand. A long list must not make a
+    // box as tall as the list (two phone screens of it, above the real list): 12 lines at most, scrolling inside.
+    for (let n = 1; n <= 30; n += 1) { type($("#own-item"), "thing number " + n); $("form.add-own").requestSubmit(); }
+    win().navigator.clipboard.writeText = async () => { throw new Error("refused by the test"); };
+    button("Copy list").click();
+    await settled(() => $(".copybox"));
+    const longBox = $(".copybox");
+    check("phone: where the browser will not copy, a long list is in a box of 12 lines at most that scrolls inside itself from its first line, with the list still close below",
+      [longBox.value.split("\n").length > 30, longBox.rows, styleOf(longBox).fieldSizing, longBox.getBoundingClientRect().height <= 300, longBox.scrollHeight > longBox.clientHeight + 100,
+        longBox.scrollTop, [longBox.selectionStart, longBox.selectionEnd === longBox.value.length], $("ul.shop").getBoundingClientRect().top - longBox.getBoundingClientRect().bottom < 200, sideways()],
+      [true, 12, "fixed", true, true, 0, [0, true], true, 0]);
+    delete win().navigator.clipboard.writeText; // the browser's own again
     const hashes = [["#/", "home"], ["#/browse", "browse"], ["#/saved", "saved"], ["#/shopping", "shopping"], ["#/prep", "prep"], ["#/draft", "draft"], ["#/draft/dlong", "draft"],
-      ["#/r/pad-thai-baby", "recipe"], ["#/r/grilled-cheese", "recipe"]];
+      ["#/r/pad-thai-baby", "recipe"], ["#/r/grilled-cheese", "recipe"],
+      ["#/r/larp-chicken-and-sticky-rice", "recipe"], ["#/browse?time=days", "browse"], ["#/draft?copy=larp-chicken-and-sticky-rice", "draft"]];
     const wide = [], small = [];
     for (const [hash, page] of hashes) {
       await go(hash, page);
       if (doc().documentElement.scrollWidth > 390) wide.push(hash + " is " + doc().documentElement.scrollWidth + " wide");
-      for (const el of $$("button, a.btn, #nav a, ol.doors a, ul.chapters a, a.row-link, select, textarea, input:not([type=checkbox]), summary, ul.ing label, ul.shop label, label.check, label.switch, .row.minor a")) {
+      for (const el of $$("button, #nav a, ol.doors a, ul.chapters a, a.row-link, select, textarea, input:not([type=checkbox]), summary, ul.ing label, ul.shop label, label.check, label.switch, .row.minor a")) {
         const box = el.getBoundingClientRect();
         if (box.width && box.height < 43.5) small.push(hash + " " + (text(el) || el.id || el.type).slice(0, 30) + " is " + Math.round(box.height));
       }
     }
     check("phone: no page scrolls sideways, even with a pasted link in a list and a draft", wide, []);
     check("phone: the things to tap are at least 44 px tall", small, []);
+
+    // The tag at 390 px beside the longest things it can sit beside. The real pages are used, with the words of
+    // the larp's row, page and plan line made long here (as text), so the site's own styles do the wrapping.
+    const longTitle = "Grandmother's Slow Fermented Cabbage with Chili, Garlic and a Great Deal of Patience";
+    const box = (el) => el.getBoundingClientRect();
+    const inside = (el, within) => box(el).left >= box(within).left - 0.5 && box(el).right <= box(within).right + 0.5;
+    // two things on one line side by side, or one under the other: either way neither covers the other
+    const apart = (a, b) => box(b).left >= box(a).right - 0.5 || box(b).top >= box(a).bottom - 0.5;
+    await go("#/browse", "browse");
+    const row = $$("ul.rows li").find((li) => li.querySelector(".days"));
+    const shortRow = [Math.round(box(row.querySelector(".days")).top - box(row.querySelector(".time")).top) < 6, inside(row.querySelector(".days"), row.querySelector(".row-link"))];
+    row.querySelector(".t").textContent = longTitle;
+    row.querySelector(".time").textContent = "SWEETS, about 13 days 23 hours 59 minutes";
+    row.querySelector(".days").textContent = "14-day recipe";
+    check("phone: in a row the tag sits on the time's line, and with a long title and a long time it goes under the time, whole, with nothing cut off",
+      [shortRow, sideways(), inside(row.querySelector(".days"), row.querySelector(".row-link")), inside(row.querySelector(".time"), row.querySelector(".row-link")),
+        apart(row.querySelector(".time"), row.querySelector(".days")), box(row.querySelector(".days")).height < 30, box(row.querySelector("button.star")).right <= 390],
+      [[true, true], 0, true, true, true, true, true]);
+    await go("#/r/larp-chicken-and-sticky-rice", "recipe");
+    $(".recipe-title").textContent = longTitle;
+    $(".recipe-head .meta span").textContent = "Ready in about 13 days 23 hours 59 minutes.";
+    $(".recipe-head .days").textContent = "14-day recipe";
+    check("phone: on the recipe page a long title, a long time and the tag wrap inside the page",
+      [sideways(), inside($(".recipe-head .days"), $(".recipe-head .meta")), box($(".recipe-head .days")).height < 30, inside($(".recipe-title"), $(".recipe-head"))], [0, true, true, true]);
+    check("phone: and a tag that wraps starts at the left edge like any other line: the wider space before it takes no room at the end of the line above",
+      [box($(".recipe-head .days")).top >= box($(".recipe-head .meta span")).bottom - 2, Math.abs(box($(".recipe-head .days")).left - box($(".recipe-head .meta")).left) < 0.75], [true, true]);
+    await go("#/prep", "prep");
+    pick($("#plan-pick"), "larp-chicken-and-sticky-rice");
+    button("Add to the plan").click();
+    const planLine = $("ul.cooking li[data-id=larp-chicken-and-sticky-rice] .cook-line");
+    const asItIs = [inside(planLine.querySelector(".days"), planLine), apart(planLine.querySelector(".t"), planLine.querySelector(".days"))];
+    planLine.querySelector(".t").textContent = longTitle;
+    planLine.querySelector(".days").textContent = "14-day recipe";
+    check("phone: in Prep the tag sits with the recipe's name, beside it or under it, whole, even under a long name, with Remove still in reach",
+      [asItIs, sideways(), inside(planLine.querySelector(".days"), planLine), apart(planLine.querySelector(".t"), planLine.querySelector(".days")), box(planLine.querySelector(".days")).height < 30,
+        box(planLine.querySelector(".remove")).right <= 390, box(planLine.querySelector(".remove")).height >= 43.5],
+      [[true, true], 0, true, true, true, true, true]);
+    const nameBox = planLine.querySelector(".cook-name");
+    check("phone: a tag that goes under a long name in Prep has room above it and below it, so it does not touch the name or the line under it",
+      [box(planLine.querySelector(".days")).top >= box(planLine.querySelector(".t")).bottom - 0.5, box(planLine.querySelector(".days")).top - box(planLine.querySelector(".t")).bottom >= 5.5,
+        box(nameBox).bottom - box(planLine.querySelector(".days")).bottom >= 3.5, box(planLine.querySelector(".t")).top - box(nameBox).top >= 3.5],
+      [true, true, true, true]);
     const bar = $("#nav").getBoundingClientRect();
     check("phone: the five names are a bar at the bottom", [win().getComputedStyle($("#nav")).position, Math.round(bar.bottom), Math.round(bar.width), $$("#nav a").map(text)],
       ["fixed", 844, 390, ["Draft", "Shopping", "Prep", "Saved", "Browse"]]);
@@ -647,6 +1188,6 @@ try {
   for (const [k, v] of aside) localStorage.setItem(k, v);
 }
 
-lines.push("RESULT " + lines.filter((x) => x.startsWith("ok")).length + " passed, " + failed + " failed");
-document.getElementById("out").textContent = lines.join("\n");
+const passed = lines.filter((x) => x.startsWith("ok")).length;
+say("RESULT " + passed + " passed, " + failed + " failed");
 document.title = failed ? "FAILED" : "PASSED";

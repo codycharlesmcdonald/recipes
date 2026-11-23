@@ -2,13 +2,27 @@
 // In the preview (preview: true) the same things are drawn one heading level down, because the Draft page has its
 // own top heading, and the tick boxes are pictures of boxes, not controls, so Tab does not stop on them.
 import { h } from "./dom.js";
-import { timeFacts, SITE_TITLE } from "./lib.js";
+import { timeFacts, daysLabel, SITE_TITLE } from "./lib.js";
+
+export function daysMark(r) {
+  // The tag on a recipe that needs more than one day ("2-day recipe"), drawn the same way wherever a recipe's
+  // time is shown: a quiet outlined word beside the time. Nothing (null) for a same-day recipe.
+  const label = daysLabel(r);
+  return label ? h("span", { class: "days" }, label) : null;
+}
 
 export function recipeHead(r, { preview = false } = {}) {
   const facts = timeFacts(r);
-  const meta = [facts.ready];
+  const meta = [];
   if (r.yield) meta.push(/^(serves|makes)/i.test(r.yield) ? r.yield : "Serves " + r.yield);
   if (r.source) meta.push("Credit: " + r.source);
+  const stopped = (m) => m + (/[.!?]$/.test(m) ? "" : ".");
+  const sentence = (m) => h("span", {}, stopped(m) + " ");
+  const mark = daysMark(r);
+  // The space on each side of the tag is a little wider than a word space (class "tag-gap"), so the outlined
+  // tag is not jammed between two sentences. It is still a plain space: at the start or the end of a line it
+  // takes no room, so a tag that wraps starts on the left edge like any other line.
+  const gap = () => h("span", { class: "tag-gap" }, " ");
   return [
     preview
       ? (r.section ? h("p", { class: "kicker" }, r.section) : null)
@@ -17,7 +31,10 @@ export function recipeHead(r, { preview = false } = {}) {
     preview ? null : h("p", { class: "print-only book-line" }, SITE_TITLE + (r.section ? ", " + r.section : "")), // on paper, where the top row is not printed
     h(preview ? "h2" : "h1", { class: "t1 recipe-title" }, r.title || "Untitled recipe"),
     r.headnote ? h("p", { class: "headnote" }, r.headnote) : null,
-    h("p", { class: "meta" }, meta.map((m) => h("span", {}, m + (/[.!?]$/.test(m) ? " " : ". ")))),
+    // the tag sits right after the time; its full stop is for someone hearing the line read out, and is not drawn
+    h("p", { class: "meta" },
+      mark ? [h("span", {}, stopped(facts.ready)), gap(), mark, h("span", { class: "offscreen" }, "."), gap()] : sentence(facts.ready),
+      meta.map(sentence)),
     facts.guess ? h("p", { class: "guess small quiet" }, facts.guess) : null,
   ];
 }

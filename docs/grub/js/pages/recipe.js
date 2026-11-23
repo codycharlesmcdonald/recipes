@@ -50,7 +50,7 @@ function wakeSwitch() {
       lock = got;
     } catch {
       box.checked = false;
-      status.textContent = "This device would not keep the screen on. Low Power Mode can block it.";
+      status.textContent = "This device would not keep the screen on. A battery saver setting can block it.";
     }
   };
   box.addEventListener("change", () => { status.textContent = ""; if (box.checked) get(); else letGo(); });

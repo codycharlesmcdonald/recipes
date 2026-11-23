@@ -2,16 +2,19 @@
 
     python3 -I tools/make_pdf.py recipes/<file>.json [--out folder]
 
-The PDF goes to docs/grub/pdf/<id>-v<version>.pdf, where the site links to it.
+The PDF goes to docs/grub/pdf/<id>-v<version>.pdf, where the site links to it. Once the new PDF is there, the
+PDFs of that recipe's earlier versions are taken out of docs/grub/pdf, so a file the site no longer links to
+does not stay published. With --out the PDF goes to the folder given, and nothing is taken out of anywhere.
 
-The page is 509.3 x 679.1 pt (1620 x 2160 px at 229 ppi), so the tablet shows it at full size with no
-scaling. Every page carries the recipe's id, version and page number as plain text in the footer, which
-is how a marked-up copy is matched back to its recipe when it returns. The right-hand column and the
+The page is asked for at 509.3 x 679.1 pt, the Paper Pro's screen (1620 x 2160 px at 229 ppi). Chrome writes
+it as 509.04 x 678.96 pt, which is within one pixel of the screen each way (tools/test_build.py measures the
+PDFs that are there). Every page carries the recipe's id, version and page number as plain text in the footer,
+which is how a marked-up copy is matched back to its recipe when it returns. The right-hand column and the
 block on the last page are left empty for handwriting.
 
-It writes the HTML next to the PDF and prints the PDF with the Chrome that is already on this Mac, run
-headless with its own throwaway profile folder, so the everyday Chrome and its profile are not touched.
-Standard library only.
+It writes the HTML the PDF is printed from into pdf-work/, which is not published, and prints the PDF with
+the Chrome that is already on this Mac, run headless with its own throwaway profile folder, so the everyday
+Chrome and its profile are not touched. Standard library only.
 """
 import argparse
 import html
@@ -23,7 +26,7 @@ import sys
 import tempfile
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-PAGE_W, PAGE_H = 509.3, 679.1          # points: the Paper Pro's portrait screen at 1:1
+PAGE_W, PAGE_H = 509.3, 679.1          # points asked for: the Paper Pro's portrait screen. Chrome writes 509.04 x 678.96.
 
 CSS = """
 @page {
@@ -78,6 +81,15 @@ def minutes_text(n):
     return out + (" %d minutes" % m if m else "")
 
 
+def days_label(r):
+    """The tag of a recipe that needs more than one day: "2-day recipe". Empty for a same-day recipe.
+    The same words as daysLabel in docs/grub/js/lib.js; tools/test_build.py checks the two agree."""
+    days = r.get("days")
+    if isinstance(days, int) and not isinstance(days, bool) and 2 <= days <= 14:
+        return "%d-day recipe" % days
+    return ""
+
+
 def step_groups(steps):
     """Steps come as a plain list of strings or as groups of {section, items}; return groups either way."""
     if steps and isinstance(steps[0], str):
@@ -121,6 +133,7 @@ def build_html(r, changes="end"):
         meta.append("Ready in %s" % minutes_text(r["total_minutes"]))
     elif t.get("total"):
         meta.append("%s total" % t["total"])
+    meta.append(days_label(r))          # right after the time, in the same line; nothing for a same-day recipe
     if r.get("yield"):
         meta.append(r["yield"] if r["yield"].lower().startswith(("serves", "makes")) else "Serves %s" % r["yield"])
     if r.get("source"):
@@ -181,10 +194,33 @@ def page_facts(pdf_path, footer):
     return len(reader.pages), words == CHANGES_TITLE.split()
 
 
+def earlier_pdfs(folder, recipe_id, version):
+    """The PDFs of this recipe's earlier versions in a folder: <id>-v<n>.pdf with n below version, as full
+    paths. Another recipe's files are never among them, whatever its id starts with."""
+    name_re = re.compile(r"^%s-v(\d+)\.pdf$" % re.escape(str(recipe_id)))
+    found = []
+    for name in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        m = name_re.match(name)
+        if m and int(m.group(1)) < int(version):
+            found.append(os.path.join(folder, name))
+    return found
+
+
+def remove_earlier_pdfs(folder, recipe_id, version):
+    """Take the PDFs of earlier versions out of the folder, but only when this version's PDF is there to take
+    their place. Returns the paths removed."""
+    if not os.path.isfile(os.path.join(folder, "%s-v%s.pdf" % (recipe_id, version))):
+        return []
+    gone = earlier_pdfs(folder, recipe_id, version)
+    for path in gone:
+        os.remove(path)
+    return gone
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("recipe")
-    ap.add_argument("--out", default=None, help="folder for the PDF (default: pdf/ beside recipes/)")
+    ap.add_argument("--out", default=None, help="folder for the PDF (default: docs/grub/pdf, where the site links to it)")
     args = ap.parse_args()
     src = os.path.abspath(args.recipe)
     r = json.load(open(src, encoding="utf-8"))
@@ -219,6 +255,10 @@ def main():
             chosen = (layout, facts)
             break
     print("%s  (changes block: %s%s)" % (pdf_path, chosen[0], ", %d pages" % chosen[1][0] if chosen[1] else ""))
+    if not args.out:
+        # only in the folder the site is published from; a folder named with --out is the caller's own
+        for path in remove_earlier_pdfs(out_dir, r["id"], r["version"]):
+            print("Removed the earlier version's PDF: %s" % path)
 
 
 if __name__ == "__main__":

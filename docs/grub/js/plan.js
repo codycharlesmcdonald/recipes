@@ -110,6 +110,9 @@ export function planDay(plan, nowMs, longest) {
   // The day the plan is for. A day he set himself is kept for as long as that meal is still ahead. Otherwise
   // it is the first day on which everything in the plan can still start in time, worked out again each time
   // the plan changes, so a long recipe added later does not start in the past.
+  // While the time is not a real time (the box is empty, or half typed) there is no meal to judge his day by,
+  // so a real day he set is kept as it is.
+  if (plan.dayChosen && !realTime(plan.time) && mealMsOf(plan.date, "12:00") !== null) return { date: plan.date, dayChosen: true };
   const meal = mealMsOf(plan.date, plan.time);
   if (plan.dayChosen && meal !== null && meal >= nowMs) return { date: plan.date, dayChosen: true };
   return { date: defaultDay(nowMs, plan.time, longest), dayChosen: false };

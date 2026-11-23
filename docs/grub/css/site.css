@@ -99,16 +99,21 @@ p { margin: 0 0 12px; }
 .kicker .sep { margin: 0 8px; color: var(--control); }
 
 /* ---------- controls: everything pressed or typed into is 44px tall with the same edge ---------- */
-button, a.btn {
+button {
   font: 600 16px/1.2 var(--sans); color: var(--head); background: transparent; border: 1px solid var(--control); border-radius: 8px;
   padding: 0 16px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   cursor: pointer; text-decoration: none;
 }
-button:hover, a.btn:hover { border-color: var(--accent); background: var(--tint); }
-button.primary, a.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-button.primary:hover, a.btn.primary:hover { background: var(--head); border-color: var(--head); }
+button:hover { border-color: var(--accent); background: var(--tint); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button.primary:hover { background: var(--head); border-color: var(--head); }
 button[aria-expanded="true"], button[aria-pressed="true"] { background: var(--tint); border-color: var(--accent); }
-button:disabled, a.btn[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+button:disabled, button[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+/* aria-disabled is a button that can still be reached and pressed, and says why it does nothing (Copy list
+   with everything ticked). Its words are still there to be read, so it is not faded: the fill goes and it
+   rests as a quiet outline, which does not light up under the mouse. The fill is back as soon as there is
+   something to copy. */
+button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover { opacity: 1; background: transparent; border-color: var(--control); color: var(--ink-soft); font-weight: 500; }
 button.danger { color: var(--warn); border-color: var(--warn); }
 button.linklike { border: 0; background: none; padding: 0; font-weight: 500; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 button.linklike:hover { background: none; color: var(--head); }
@@ -126,7 +131,7 @@ button.chip[aria-pressed="true"] { color: var(--head); font-weight: 650; }
 .row .push.quiet-btn { margin-right: -16px; } /* its words end on the column's edge */
 .stack { display: flex; flex-direction: column; gap: 10px; max-width: 24rem; }
 .stack .split { display: flex; gap: 10px; }
-.stack .split > * { flex: 1 1 auto; padding: 0 10px; }
+.stack .split > * { flex: 1 1 0; padding: 0 10px; } /* the two halves are the same width, whatever their words */
 /* A status line is on the page from the start, empty, so a screen reader hears it when words arrive. */
 .status { margin: 12px 0 0; color: var(--warn); }
 .status:empty { margin: 0; }
@@ -158,14 +163,16 @@ input[type="checkbox"]:not([role="switch"]):checked { background-color: var(--ac
 .field.inline > span { margin: 0; font-weight: 500; color: var(--ink); }
 .field.inline input { width: 6.5rem; }
 .check { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
-.copybox { font-size: 15px; margin-top: 10px; }
+/* A box of text to copy by hand keeps the height its rows ask for (12 lines at most) and scrolls inside,
+   however long the text is. Other text boxes grow with what is typed into them. */
+.copybox { font-size: 15px; margin-top: 10px; field-sizing: fixed; }
+/* a box or a choice that holds something no recipe file can be made from */
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn); }
 details.help { margin-top: 28px; border-top: 1px solid var(--line); }
 details.help summary { cursor: pointer; padding: 12px 0; min-height: 44px; font-weight: 600; color: var(--accent); display: flex; align-items: baseline; gap: 10px; list-style: none; }
 details.help summary::-webkit-details-marker { display: none; }
 details.help summary::before { content: ""; flex: none; width: 0; height: 0; border: 5px solid transparent; border-left: 7px solid currentColor; border-right: 0; transform-origin: 3px 5px; }
 details.help[open] summary::before { transform: rotate(90deg); }
-details.help ol { margin: 0 0 12px; padding-left: 1.4em; max-width: 38rem; }
-details.help li { margin-bottom: 6px; }
 .switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
 /* Off is a hollow track with a knob in the outline colour; on is a filled track. The knob is part of the background. */
 .switch input {
@@ -208,10 +215,24 @@ ul.titles a:hover { color: var(--accent); text-decoration: underline; }
 .results h2:first-child { margin-top: 0; }
 ul.rows { list-style: none; margin: 0; padding: 0; }
 ul.rows li { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--line); }
-a.row-link { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 4px 16px; padding: 13px 0; text-decoration: none; color: inherit; }
+/* A row is its title, then what goes with it (the time and, when there is one, the tag) on the right. The
+   title always keeps half the row: what is on the right has its full width until that would take more, and
+   then the tag goes under the time before a long title is squeezed into a sliver. */
+a.row-link { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(50%, 1fr) auto; align-items: baseline; gap: 4px 16px; padding: 13px 0; text-decoration: none; color: inherit; }
 .row-link .t { font: 600 20px/1.3 var(--serif); color: var(--head); min-width: 0; overflow-wrap: anywhere; }
 .row-link:hover .t { color: var(--accent); text-decoration: underline; }
-.row-link .m { color: var(--ink-soft); font-size: 15px; white-space: nowrap; }
+.row-link .m { min-width: 0; justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 2px 10px; color: var(--ink-soft); font-size: 15px; text-align: right; }
+/* Where the times stand in a column on the right, every time ends on the same edge: the tag sits to the left
+   of its time, and goes under it, still on that edge, when the two do not fit on one line. In the page the
+   time still comes first, so that is the order it is read out in. */
+@media (min-width: 700px) {
+  .row-link .m { flex-direction: row-reverse; justify-content: flex-start; }
+}
+/* The tag on a recipe that needs more than one day ("2-day recipe"), beside the time wherever a recipe's time
+   is shown: the page's own type inside a thin outline. It is not something to press, so it has the hairline
+   of a rule, not the edge of a control, and no fill. It is no taller than the line of text it sits in, so a
+   row with a tag is the same height as a row without one. */
+.days { display: inline-block; font: 500 14px/1.35 var(--sans); color: var(--ink); border: 1px solid var(--rule); border-radius: 5px; padding: 0 8px; white-space: nowrap; }
 button.star { width: 44px; padding: 0; border-color: transparent; color: var(--accent); flex: none; margin-right: -10px; }
 button.star[aria-pressed="true"] { background: transparent; border-color: transparent; }
 button.star.with-text { width: auto; margin: 0; padding: 0 16px 0 12px; border-color: var(--control); color: var(--head); }
@@ -228,6 +249,7 @@ button.star[aria-pressed="true"] .star-icon { fill: var(--accent-fill); stroke: 
 .recipe-head { max-width: 48rem; }
 .headnote { font: italic 21px/1.5 var(--serif); margin: 0 0 16px; max-width: 36rem; overflow-wrap: anywhere; }
 .meta { color: var(--ink-soft); margin: 0 0 6px; max-width: 40rem; text-wrap: pretty; overflow-wrap: anywhere; }
+.meta .tag-gap { word-spacing: 6px; } /* the space on each side of the tag: wider than a word space, and gone at the start or end of a line */
 .guess { margin: 0 0 6px; text-wrap: pretty; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 28px; margin: 18px 0 0; }
 .actions .row { margin-top: 0; }
@@ -242,7 +264,6 @@ button.star[aria-pressed="true"] .star-icon { fill: var(--accent-fill); stroke: 
 .steps-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 16px; margin: 0 0 10px; }
 .steps-head > :first-child { margin: 0; }
 .keep-on { display: flex; flex-direction: column; align-items: flex-end; }
-.switch-note:empty { display: none; }
 ul.ing { list-style: none; margin: 0; padding: 0; }
 ul.ing li { border-bottom: 1px solid var(--line); }
 ul.ing .ing-line { display: flex; gap: 12px; align-items: flex-start; padding: 11px 0; min-height: 44px; }
@@ -284,6 +305,9 @@ ul.cooking { list-style: none; margin: 0 0 18px; padding: 0; border-top: 1px sol
 ul.cooking li { border-bottom: 1px solid var(--line); padding: 8px 0 12px; }
 ul.cooking p { margin: 0; }
 .cook-line { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+/* The tag sits beside the name, or under it where there is no room. Under it, it has air above and below:
+   the gap between the two lines, and the padding, which a name on one line never fills (the line is 44px tall). */
+.cook-name { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 4px 0; }
 .cook-line .t { font: 600 20px/1.3 var(--serif); color: var(--head); text-decoration: none; min-width: 0; overflow-wrap: anywhere; }
 .cook-line .t:hover { color: var(--accent); text-decoration: underline; }
 .guess-line .time-boxes { margin: 10px 0 0; }
@@ -307,6 +331,7 @@ ol.timeline .eat .what { font-weight: 700; }
 ol.timeline .sub { display: block; }
 .plan-out + .row { margin-top: 26px; }
 .plan-note { margin-top: 22px; }
+.plan-note p:last-child { margin-bottom: 0; }
 
 /* ---------- draft ---------- */
 .note { border-left: 3px solid var(--accent-fill); padding: 2px 0 2px 14px; margin: 0 0 22px; }
@@ -317,6 +342,10 @@ fieldset.time { border: 0; padding: 0; margin: 0 0 20px; min-width: 0; }
 fieldset.time legend { font-weight: 600; color: var(--head); padding: 0; margin-bottom: 6px; }
 .time-boxes { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-bottom: 12px; }
 .say { margin: 12px 0 0; color: var(--head); font-weight: 500; max-width: 34rem; }
+.say.warn { color: var(--warn); } /* the line refuses something: the colour of the list of what is missing */
+.days-field { margin: 0 0 20px; }
+.days-field .field { margin: 0; }
+.days-field .say:empty { margin: 0; } /* in the page while empty, so its words are heard when they arrive; no room taken until then */
 .needed { color: var(--warn); margin: 0 0 4px; }
 .needed.ok { color: var(--accent); }
 .finish { border-top: 1px solid var(--line); margin-top: 30px; }
@@ -405,7 +434,8 @@ fieldset.time legend { font-weight: 600; color: var(--head); padding: 0; margin-
   ul.titles a { min-height: 44px; }
   .results h2 { font-size: 26px; margin-top: 36px; }
   .headnote { font-size: 19px; }
-  a.row-link { flex-direction: column; align-items: flex-start; padding: 11px 0; }
+  a.row-link { grid-template-columns: minmax(0, 1fr); padding: 11px 0; }
+  .row-link .m { justify-self: start; justify-content: flex-start; text-align: left; } /* under the title, from the left; a long time and the tag go onto two lines before anything is cut off */
   ol.steps li { padding-left: 38px; font-size: 17px; }
   .stack, .add-own { max-width: none; }
   /* a recipe's three buttons in one row */
@@ -445,6 +475,7 @@ fieldset.time legend { font-weight: 600; color: var(--head); padding: 0; margin-
   h3, h4, .t3 { font-size: 12pt; margin: 8pt 0 2pt; }
   h1, h2, h3, h4, .t1, .t2, .t3, .plan-day { break-after: avoid; }
   .headnote { font-size: 12pt; margin-bottom: 5pt; }
+  .days { font-size: 9.5pt; border-width: 0.75pt; border-color: #444; padding: 0 4pt; } /* beside the time on paper too */
   .ingredients, .preview .ingredients { margin-bottom: 10pt; }
   ul.ing, ul.shop { columns: 2; column-gap: 24pt; }
   ul.ing li, ul.shop li { break-inside: avoid; border-bottom: 0; }

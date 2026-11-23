@@ -76,7 +76,7 @@ export function groups(list) {
   return out.filter((g) => g.recipeId).concat(out.filter((g) => !g.recipeId));
 }
 
-export function sendLines(list) {
-  // what goes to Reminders or the clipboard: the things not yet ticked, the same thing from two recipes once
+export function copyLines(list) {
+  // what Copy list copies, one line each: the things not yet ticked, the same thing from two recipes once
   return mergedLines(list.filter((x) => !x.got));
 }
